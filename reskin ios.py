@@ -23,9 +23,9 @@ parser.add_argument('-run', help='Wet run. Otherwise, just dry run')
 
 args = parser.parse_args()
 
+name = args.name
 srcDir = args.source
 trgDir = args.target
-name = args.name
 bundle = args.bundle
 leaderboard = args.leaderboard
 iap = args.iap
@@ -60,6 +60,7 @@ def copyFilesByGlob(source, target):
 	    if run:
 	    	shutil.copy(file, target)
 
+# Copy entire tree (folder)
 def copyTree(source, target):
 	global itemsCopied, run
 	print("Copying tree " + source + " to " + target)
@@ -68,6 +69,14 @@ def copyTree(source, target):
 		shutil.rmtree(target)
 		shutil.copytree(source, target)
 
+# Replace "replacewhat" in fileToEdit with "replaceWith"
+def replaceInFile(fileToEdit, replaceWhat, replaceWith):
+	global run
+	if run:
+	with fileinput.FileInput(fileToEdit, inplace=True, backup='.bak') as file:
+	    for line in file:
+	        print(line.replace(replaceWhat, replaceWith), end='')
+
 # FILES REPLACEMENT
 # -----------------
 # replace all icons in main dir
@@ -75,31 +84,9 @@ print("Replacing icons on main dir...")
 
 itemsCopied = 0
 copyFilesByGlob(srcDir + "/AppIcon*.png", trgDir)
-# for file in glob.glob(srcDir + "/AppIcon*.png"):
-#     print("Copying " + file + " to " + trgDir)
-#     itemsCopied+=1
-#     if run:
-#     	shutil.copy(file, trgDir)
-
 copyFilesByGlob(srcDir + "/iTunesArtwork*.png", trgDir)
-# for file in glob.glob(srcDir + "/iTunesArtwork*.png"):
-#     print("Copying " + file + " to " + trgDir)
-#     itemsCopied+=1
-#     if run:
-#     	shutil.copy(file, trgDir)
-
 copyFilesByName(srcDir + "/icon-ipad.png", trgDir)
-# print("Copying " + srcDir + "/icon-ipad.png" + " to " + trgDir)
-
-# itemsCopied+=1
-# if run:
-	# shutil.copy(srcDir + "/icon-ipad.png", trgDir)
-
 copyFilesByName(trgDir + "/iTunesArtwork@2x.png", trgDir + "/icon1024.png")
-# print("Generating icon1024.png...")
-# itemsCopied+=1
-# if run:
-# 	shutil.copy(trgDir + "/iTunesArtwork@2x.png", trgDir + "/icon1024.png")
 
 checkCopy(18,itemsCopied)
 itemsCopied = 0
@@ -109,7 +96,6 @@ print("Done.")
 print("Replacing icons in Images.xcassets...")
 
 dirToCopy = "/PartySlots/Images.xcassets/AppIcon.appiconset"
-# copyTree(srcDir + dirToCopy, trgDir + dirToCopy)
 copyFilesByGlob(srcDir + "/AppIcon*.png", trgDir + dirToCopy)
 copyFilesByGlob(srcDir + "/iTunesArtwork*.png", trgDir + dirToCopy)
 copyFilesByName(srcDir + "/icon-ipad.png", trgDir + dirToCopy)
@@ -117,11 +103,6 @@ copyFilesByName(trgDir + dirToCopy + "/AppIcon29x29.png", trgDir + dirToCopy + "
 copyFilesByName(trgDir + dirToCopy + "/AppIcon29x29@2x.png", trgDir + dirToCopy + "/AppIcon29x29@2x-1.png")
 copyFilesByName(trgDir + dirToCopy + "/AppIcon40x40@2x.png", trgDir + dirToCopy + "/AppIcon40x40@2x-1.png")
 copyFilesByName(trgDir + dirToCopy + "/iTunesArtwork@2x.png", trgDir + dirToCopy + "/icon1024.png")
-# print("Copying " + srcDir + dirToCopy + " to " + trgDir + dirToCopy)
-# itemsCopied+=1
-# if run:
-# 	shutil.rmtree(trgDir + dirToCopy)
-# 	shutil.copytree(srcDir + dirToCopy, trgDir + dirToCopy)
 
 checkCopy(21,itemsCopied)
 itemsCopied = 0
@@ -132,11 +113,6 @@ print("Replacing reskin assets in artwork...")
 
 dirToCopy = "/SimpleSlots/artwork/reskin"
 copyTree(srcDir + dirToCopy, trgDir + dirToCopy)
-# print("Copying " + srcDir + dirToCopy + " to " + trgDir + dirToCopy)
-# itemsCopied+=1
-# if run:
-# 	shutil.rmtree(trgDir + dirToCopy)
-# 	shutil.copytree(srcDir + dirToCopy, trgDir + dirToCopy)
 
 checkCopy(1,itemsCopied)
 itemsCopied = 0
@@ -150,10 +126,6 @@ trgIconFiles = ["/SimpleSlots/artwork/icon.png", "/SimpleSlots/artwork/icon@2x.p
 
 for i in range(0, len(srcIconFiles)):
 	copyFilesByName(srcDir + srcIconFiles[i], trgDir + trgIconFiles[i])
-	# print("Copying " + srcDir + srcIconFiles[i] + " to " + trgDir + trgIconFiles[i])
-	# itemsCopied+=1
-	# if run:
-	# 	shutil.copy(srcDir + srcIconFiles[i], trgDir + trgIconFiles[i])
 
 checkCopy(4,itemsCopied)
 itemsCopied = 0
@@ -205,11 +177,11 @@ print("Done.")
 
 # replace game name
 print("Replacing game name...")
-
-if run:
-	with fileinput.FileInput(infoPlistFile, inplace=True, backup='.bak') as file:
-	    for line in file:
-	        print(line.replace("enter_game_name_here", name), end='')
+replaceInFile(infoPlistFile, "enter_game_name_here", name)
+# if run:
+# 	with fileinput.FileInput(infoPlistFile, inplace=True, backup='.bak') as file:
+# 	    for line in file:
+# 	        print(line.replace("enter_game_name_here", name), end='')
 
 print("Done.")
 
