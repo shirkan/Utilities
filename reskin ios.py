@@ -1,6 +1,7 @@
+#!/usr/local/bin/python3
 import argparse, shutil, glob, fileinput, sys
 
-print("iOS reskinner v1.1")
+print("iOS slots reskinner v1.2")
 
 # Required arguments
 parser = argparse.ArgumentParser(description='Reskin an iOS slot machine')
@@ -73,9 +74,9 @@ def copyTree(source, target):
 def replaceInFile(fileToEdit, replaceWhat, replaceWith):
 	global run
 	if run:
-	with fileinput.FileInput(fileToEdit, inplace=True, backup='.bak') as file:
-	    for line in file:
-	        print(line.replace(replaceWhat, replaceWith), end='')
+		with fileinput.FileInput(fileToEdit, inplace=True, backup='.bak') as file:
+		    for line in file:
+		        print(line.replace(replaceWhat, replaceWith), end='')
 
 # FILES REPLACEMENT
 # -----------------
