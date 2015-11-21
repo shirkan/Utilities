@@ -1,4 +1,4 @@
-import shutil, glob, fileinput, sys
+import shutil, glob, fileinput, sys, os
 
 # Variables
 itemsCopied = 0
@@ -14,6 +14,8 @@ def checkCopy(itemsToCopy):
 # Copy files by full name
 def copyFilesByName(source, target):
 	global itemsCopied, run
+	if not os.path.isfile(source):
+		sys.exit("File not exists: " + source)
 	print("Copying " + source + " to " + target)
 	itemsCopied+=1
 	if run:

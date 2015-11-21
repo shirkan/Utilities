@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
-import argparse, sys, reskinutils
+import argparse, sys, reskinutils, os
 
-print("Android slots reskinner v1.3")
+print("Graphics 2 Android slots reskinner v1.1")
 
 defaultCoins = 5000
 
@@ -9,8 +9,10 @@ defaultCoins = 5000
 parser = argparse.ArgumentParser(description='Reskin an iOS slot machine')
 # game name
 parser.add_argument('-name', required=True, help='Name of the game to be present on device (should be rathe short and comply with title in ASO)')
-# source dir
-parser.add_argument('-source', required=True, help='Source dir with assets')
+# assets dir
+parser.add_argument('-assets', required=True, help='Graphics dir with assets (worlds & reels)')
+# icons dir
+parser.add_argument('-icons', required=True, help='Icons dir')
 # target dir (duplicated dir)
 parser.add_argument('-target', required=True, help='Target dir of duplicated version')
 # bundle id
@@ -27,7 +29,8 @@ parser.add_argument('-run', help='Wet run. Otherwise, just dry run')
 # Arguments
 args = parser.parse_args()
 name = args.name
-srcDir = args.source
+assets = args.assets
+icons = args.icons
 trgDir = args.target
 bundle = args.bundle
 basekey = args.basekey
@@ -50,34 +53,41 @@ if __name__ == '__main__':
 	# FILES REPLACEMENT
 	# -----------------
 
-	srcAssets = srcDir + "/assets"
 	trgAssets = trgDir + "/assets"
-	srcRes = srcDir + "/res"
 	trgRes = trgDir + "/res"
 
 	# replace worlds
 	print("Replacing worlds assets...")
-	for i in range(1,5):
-		reskinutils.copyFilesByGlob(srcAssets + "/game" + str(i) + "*.png", trgAssets)
-	reskinutils.checkCopy(2*(4+3))
+	reskinutils.copyFilesByGlob(assets + "/LevelSelect/game*@2x.png", trgAssets)
+	reskinutils.checkCopy(2*4 + 2)
 	print("Done.")
 
 	# replace reels
 	print("Replacing reels assets...")
 	reelsDict = ["gems", "horse", "mega", "slot"]
+	assetsDict = ["7", "A", "bonus", "diamond", "J", "K", "lemon", "Q", "star", "wild"]
+	# copy lvl[i]/lvl[i]item_<asset_name>@2x.png to <reels_name>item_<asset_name_title>@2x.png & <reels_name>/<asset_name_title>_<reels_name>.png
 	for i in range(0, len(reelsDict)):
-		reskinutils.copyFilesByGlob(srcAssets + "/" + reelsDict[i] + "*.png", trgAssets)
-	reskinutils.checkCopy(len(reelsDict) * 10)
-	for i in range(0, len(reelsDict)):
-		reskinutils.copyTree(srcAssets + "/" + reelsDict[i], trgAssets + "/" + reelsDict[i])
-	reskinutils.checkCopy(len(reelsDict))
+		for j in range(0, len(assetsDict)):
+			fileToCopy = assets + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j] + "@2x.png"
+			if not (os.path.isfile(fileToCopy)):
+				print("Cannot find " + fileToCopy + ", trying to capitalizing asset name...")
+				fileToCopy = assets + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j].title() + "@2x.png"
+				if not (os.path.isfile(fileToCopy)):
+					sys.exit("Cannot find " + assets + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j] + "@2x.png or " + fileToCopy)
+			
+			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "item_" + assetsDict[j].title() + "@2x.png")
+			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "/" + assetsDict[j].title() + "_" + reelsDict[i] +".png")
+	reskinutils.checkCopy(len(reelsDict) * len(assetsDict) * 2)
 	print("Done.")
 
 	# replace icons
 	print("Replacing icons...")
+	# 72 x 72, 57 x 57, 144 x 144
+	sizesDict = ["72x72", "57x57", "72x72@2x"]
 	iconsDict = ["drawable-hdpi/icon.png", "drawable-mdpi/icon.png", "drawable-xhdpi/icon.png"]
 	for i in range(0, len(iconsDict)):
-		reskinutils.copyFilesByGlob(srcRes + "/" + iconsDict[i], trgRes + "/" + iconsDict[i])
+		reskinutils.copyFilesByGlob(icons + "/AppIcon" + sizesDict[i] + ".png", trgRes + "/" + iconsDict[i])
 	reskinutils.checkCopy(len(iconsDict))
 	print("Done.")
 

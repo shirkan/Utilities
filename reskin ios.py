@@ -1,7 +1,10 @@
 #!/usr/local/bin/python3
 import argparse, sys, reskinutils
 
-print("iOS slots reskinner v1.3")
+print("iOS slots reskinner v1.5")
+
+defaultCoins = 5000
+defaultVer = "1.0"
 
 # Required arguments
 parser = argparse.ArgumentParser(description='Reskin an iOS slot machine')
@@ -19,6 +22,14 @@ parser.add_argument('-leaderboard', required=True, help='Leaderboard ID')
 parser.add_argument('-iap', required=True, help='IAP ID convention')
 # server ID
 parser.add_argument('-id', required=True, help='UNIVERSE server ID')
+#Parse app ID
+parser.add_argument('-parseid', required=True, help='Parse app ID')
+#Parse client key
+parser.add_argument('-parseck', required=True, help='Parse client key')
+# Coins
+parser.add_argument('-coins', default = defaultCoins, help='Initial coins amount, default is ' + str(defaultCoins))
+# Version
+parser.add_argument('-ver', default = defaultVer, help='Version & build number, default is ' + defaultVer)
 # run or not?
 parser.add_argument('-run', help='Wet run. Otherwise, just dry run')
 
@@ -31,10 +42,15 @@ bundle = args.bundle
 leaderboard = args.leaderboard
 iap = args.iap
 serverID = args.id
+parseid = args.parseid
+parseck = args.parseck
+coins = args.coins
+ver = args.ver
 reskinutils.run = args.run
 
 configFile = trgDir + "/SimpleSlots/configure.h"
 serverFile = trgDir + "/SimpleSlots/ServerManager.m"
+appdelegateFile = trgDir + "/SimpleSlots/AppDelegate.m"
 infoPlistFile = trgDir + "/SimpleSlots/PartySlots-Info.plist"
 
 # FILES REPLACEMENT
@@ -96,6 +112,11 @@ print("Replacing IAP ID...")
 reskinutils.replaceInFile(configFile, "<enter_iap_id_here>", iap)
 print("Done.")
 
+# replace coins in name
+print("Replacing coins in game to " + str(coins))
+reskinutils.replaceInFile(configFile, "<enter_coins_here>", str(coins))
+print("Done.")
+
 # replace server ID
 print("Replacing server ID...")
 reskinutils.replaceInFile(serverFile, "<enter_server_id_here>", serverID)
@@ -103,12 +124,27 @@ print("Done.")
 
 # replace bundleID
 print("Replacing bundle ID...")
-reskinutils.replaceInFile(infoPlistFile, "<enter_bundle_id_here>", bundle)
+reskinutils.replaceInFile(infoPlistFile, "enter_bundle_id_here", bundle)
 print("Done.")
 
 # replace game name
 print("Replacing game name...")
 reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name)
+print("Done.")
+
+# replace version & build
+print("Replacing version & build...")
+reskinutils.replaceInFile(infoPlistFile, "enter_version_here", ver)
+print("Done.")
+
+# replace Parse ID
+print("Replacing parse ID...")
+reskinutils.replaceInFile(appdelegateFile, "<enter_parse_app_id_here>", parseid)
+print("Done.")
+
+# replace Parse client key
+print("Replacing parse client key...")
+reskinutils.replaceInFile(appdelegateFile, "<enter_parse_client_key_here>", parseck)
 print("Done.")
 
 # END OF CODE REPLACEMENT
