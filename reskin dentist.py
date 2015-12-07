@@ -1,7 +1,9 @@
 #!/usr/local/bin/python3
 import argparse, sys, reskinutils
 
-print("iOS dentist reskinner v1.0")
+print("iOS dentist reskinner v1.1")
+
+defaultVer = "1.0"
 
 # Required arguments
 parser = argparse.ArgumentParser(description='Reskin an iOS dentist game')
@@ -17,6 +19,8 @@ parser.add_argument('-bundle', required=True, help='Bundle ID')
 parser.add_argument('-iap', required=True, help='IAP ID convention')
 # server ID
 parser.add_argument('-id', required=True, help='UNIVERSE server ID')
+# Version
+parser.add_argument('-ver', default = defaultVer, help='Version & build number, default is ' + defaultVer)
 # run or not?
 parser.add_argument('-run', default=False, help='Wet run. Otherwise, just dry run (which is also default)')
 
@@ -27,6 +31,7 @@ srcDir = args.source
 trgDir = args.target
 bundle = args.bundle
 iap = args.iap
+ver = args.ver
 serverID = args.id
 reskinutils.run = args.run
 
@@ -80,6 +85,11 @@ print("Done.")
 # replace game name
 print("Replacing game name...")
 reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name)
+print("Done.")
+
+# replace version & build
+print("Replacing version & build...")
+reskinutils.replaceInFile(infoPlistFile, "enter_version_here", ver)
 print("Done.")
 
 # END OF CODE REPLACEMENT

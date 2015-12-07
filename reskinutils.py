@@ -4,6 +4,19 @@ import shutil, glob, fileinput, sys, os
 itemsCopied = 0
 run = 0
 
+# Print func
+def reskinPrint(msg, type="i", exit=False):
+	printTypes = {
+		"e" : "-E-  ",
+		"i" : "-I-  ",
+		"w" : "-W-  "
+	}
+
+	printType = printTypes.get(type,"")
+	print(printType + msg)
+	if (exit):
+		sys.exit()
+
 # Generic copying validation by number of files to copy
 def checkCopy(itemsToCopy):
 	global itemsCopied
@@ -16,7 +29,7 @@ def copyFilesByName(source, target):
 	global itemsCopied, run
 	if not os.path.isfile(source):
 		sys.exit("File not exists: " + source)
-	print("Copying " + source + " to " + target)
+	reskinPrint("Copying " + source + " to " + target)
 	itemsCopied+=1
 	if run:
 		shutil.copy(source, target)
@@ -26,7 +39,7 @@ def copyFilesByName(source, target):
 def copyFilesByGlob(source, target):
 	global itemsCopied, run
 	for file in glob.glob(source):
-	    print("Copying globbed " + file + " to " + target)
+	    reskinPrint("Copying globbed " + file + " to " + target)
 	    itemsCopied+=1
 	    if run:
 	    	shutil.copy(file, target)
@@ -34,7 +47,7 @@ def copyFilesByGlob(source, target):
 # Copy entire tree (folder)
 def copyTree(source, target):
 	global itemsCopied, run
-	print("Copying tree " + source + " to " + target)
+	reskinPrint("Copying tree " + source + " to " + target)
 	itemsCopied+=1
 	if run:
 		shutil.rmtree(target)
@@ -52,7 +65,7 @@ def replaceInFile(fileToEdit, replaceWhat, replaceWith):
 def replaceInFileByGlob(filesToEdit, replaceWhat, replaceWith):
 	global run
 	for globbedFile in glob.glob(filesToEdit):
-		print("Editing globbed file " + globbedFile)
+		reskinPrint("Editing globbed file " + globbedFile)
 		with fileinput.FileInput(globbedFile, inplace=True) as file:
 			for line in file:
 				if run:

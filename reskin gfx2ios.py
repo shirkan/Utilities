@@ -1,7 +1,8 @@
 #!/usr/local/bin/python3
-import argparse, sys, reskinutils
+import argparse, sys, reskinutils, glob
+from reskinutils import reskinPrint
 
-print("iOS slots reskinner v1.5")
+print("Graphics 2 iOS slots reskinner v1.0")
 
 defaultCoins = 5000
 defaultVer = "1.0"
@@ -10,8 +11,10 @@ defaultVer = "1.0"
 parser = argparse.ArgumentParser(description='Reskin an iOS slot machine')
 # game name
 parser.add_argument('-name', required=True, help='Name of the game to be present on device (should be rathe short and comply with title in ASO)')
-# source dir
-parser.add_argument('-source', required=True, help='Source dir with assets')
+# assets dir
+parser.add_argument('-assets', required=True, help='Graphics dir with assets (worlds & reels)')
+# icons dir
+parser.add_argument('-icons', required=True, help='Icons dir')
 # target dir (duplicated dir)
 parser.add_argument('-target', required=True, help='Target dir of duplicated version')
 # bundle id
@@ -36,7 +39,8 @@ parser.add_argument('-run', help='Wet run. Otherwise, just dry run')
 args = parser.parse_args()
 
 name = args.name
-srcDir = args.source
+assets = args.assets
+icons = args.icons
 trgDir = args.target
 bundle = args.bundle
 leaderboard = args.leaderboard
@@ -58,9 +62,9 @@ infoPlistFile = trgDir + "/SimpleSlots/PartySlots-Info.plist"
 # replace all icons in main dir
 print("Replacing icons on main dir...")
 
-reskinutils.copyFilesByGlob(srcDir + "/AppIcon*.png", trgDir)
-reskinutils.copyFilesByGlob(srcDir + "/iTunesArtwork*.png", trgDir)
-reskinutils.copyFilesByName(srcDir + "/icon-ipad.png", trgDir)
+reskinutils.copyFilesByGlob(icons + "/AppIcon*.png", trgDir)
+reskinutils.copyFilesByGlob(icons + "/iTunesArtwork*.png", trgDir)
+reskinutils.copyFilesByName(icons + "/AppIcon72x72.png", trgDir + "/icon-ipad.png")
 reskinutils.copyFilesByName(trgDir + "/iTunesArtwork@2x.png", trgDir + "/icon1024.png")
 reskinutils.checkCopy(18)
 print("Done.")
@@ -69,9 +73,9 @@ print("Done.")
 print("Replacing icons in Images.xcassets...")
 
 dirToCopy = "/PartySlots/Images.xcassets/AppIcon.appiconset"
-reskinutils.copyFilesByGlob(srcDir + "/AppIcon*.png", trgDir + dirToCopy)
-reskinutils.copyFilesByGlob(srcDir + "/iTunesArtwork*.png", trgDir + dirToCopy)
-reskinutils.copyFilesByName(srcDir + "/icon-ipad.png", trgDir + dirToCopy)
+reskinutils.copyFilesByGlob(icons + "/AppIcon*.png", trgDir + dirToCopy)
+reskinutils.copyFilesByGlob(icons + "/iTunesArtwork*.png", trgDir + dirToCopy)
+reskinutils.copyFilesByName(trgDir + "/icon-ipad.png", trgDir + dirToCopy)
 reskinutils.copyFilesByName(trgDir + dirToCopy + "/AppIcon29x29.png", trgDir + dirToCopy + "/AppIcon29x29-1.png")
 reskinutils.copyFilesByName(trgDir + dirToCopy + "/AppIcon29x29@2x.png", trgDir + dirToCopy + "/AppIcon29x29@2x-1.png")
 reskinutils.copyFilesByName(trgDir + dirToCopy + "/AppIcon40x40@2x.png", trgDir + dirToCopy + "/AppIcon40x40@2x-1.png")
@@ -83,15 +87,20 @@ print("Done.")
 print("Replacing reskin assets in artwork...")
 
 dirToCopy = "/SimpleSlots/artwork/reskin"
-reskinutils.copyTree(srcDir + dirToCopy, trgDir + dirToCopy)
-reskinutils.checkCopy(1)
+subdirs = ["/LevelSelect", "/lvl1", "/lvl2", "/lvl3", "/lvl4"]
+for i in range(0, len(subdirs)):
+	reskinutils.copyFilesByGlob(assets + subdirs[i] + "/*.png", trgDir + dirToCopy + subdirs[i])
+reskinutils.checkCopy(4 * 20 + 2 * 2 *4)
 print("Done.")
 
 # replace simpleslots/artwork/feature_overlay*
 print("Replacing feature overlay in artwork...")
 dirToCopy = "/SimpleSlots/artwork"
-reskinutils.copyFilesByGlob(srcDir + dirToCopy + "/feature_overlay*.png", trgDir + dirToCopy)
-reskinutils.checkCopy(2)
+if len(glob.glob(trgDir + dirToCopy + "reskin/LevelSelect/feature_overlay*.png"))>0:
+	reskinutils.copyFilesByGlob(trgDir + dirToCopy + "reskin/LevelSelect/feature_overlay*.png", trgDir + dirToCopy)
+	reskinutils.checkCopy(2)
+else:
+	reskinPrint("Couldn't find feature_overlay files...", "w")
 print("Done.")
 
 # replace simpleslots/artwork/icon*
@@ -101,7 +110,7 @@ srcIconFiles = ["/AppIcon57x57.png", "/AppIcon57x57@2x.png", "/AppIcon72x72.png"
 trgIconFiles = ["/SimpleSlots/artwork/icon.png", "/SimpleSlots/artwork/icon@2x.png", "/SimpleSlots/artwork/icon-ipad.png", "/SimpleSlots/artwork/icon-ipad@2x.png"]
 
 for i in range(0, len(srcIconFiles)):
-	reskinutils.copyFilesByName(srcDir + srcIconFiles[i], trgDir + trgIconFiles[i])
+	reskinutils.copyFilesByName(icons + srcIconFiles[i], trgDir + trgIconFiles[i])
 reskinutils.checkCopy(4)
 print("Done.")
 
