@@ -65,7 +65,7 @@ res = browser.submit()
 # print "Step 2: \n" + res.get_data()
 # print "----------------------------------------------------------------------"
 
-# Go to employer panel
+# Create new app
 site = IOS_NEW_APP_URL if platform == 'ios' else ANDROID_NEW_APP_URL
 category = DENTIST_TYPE if type == 'dentist' else (IOS_SLOT_TYPE if platform == 'ios' else ANDROID_SLOT_TYPE)
 
