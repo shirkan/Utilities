@@ -1,13 +1,14 @@
 #!/usr/bin/ruby
 require "spaceship"
+require "date"
 
 # Consts
 NONE = "none"
 INI_SETUP_FILE = "appstore.ini"
 
 module TYPES
-    SLOTS = "SLOTS"
-    DENTIST = "DENTIST"
+    SLOTS = "Slots"
+    DENTIST = "Dentist"
 end
 GAMES_TYPES = [TYPES::SLOTS, TYPES::DENTIST]
 
@@ -24,6 +25,7 @@ end
 MAIN_MENU_OPTIONS = { "Select account & app" => "selectAccountAndApp",
     "Select account" => "selectAccount",
     "Select app" => "selectApp",
+    "Accounts status (contol table, takes several minutes...)" => "accountsStatus",
     "Keywords menu" => "keywordsMenu",
     "Titles menu" => "titlesMenu",
     "Create new app in account" => "createNewAppInAccount",
@@ -42,16 +44,16 @@ TITLES_MENU_OPTIONS = { "Get current titles" => "getTitles",
     "Update titles from file" => "updateTitlesFromFile"
 }
 
-UPDATE_GENERIC_KEYWORDS_OPTIONS = { "Slots" => "updateGenericKeywords(TYPES::SLOTS)",
-    "Dentist" => "updateGenericKeywords(TYPES::DENTIST)"
+UPDATE_GENERIC_KEYWORDS_OPTIONS = { TYPES::SLOTS => "updateGenericKeywords(TYPES::SLOTS)",
+    TYPES::DENTIST => "updateGenericKeywords(TYPES::DENTIST)"
 }
 
-CREATE_NEW_APP_OPTIONS = { "Slots" => "createNewApp(TYPES::SLOTS)",
-    "Dentist" => "createNewApp(TYPES::DENTIST)"
+CREATE_NEW_APP_OPTIONS = { TYPES::SLOTS => "createNewApp(TYPES::SLOTS)",
+    TYPES::DENTIST => "createNewApp(TYPES::DENTIST)"
 }
 
-UPDATE_APP_OPTIONS = { "Slots" => "updateApp(TYPES::SLOTS)",
-    "Dentist" => "updateApp(TYPES::DENTIST)"
+UPDATE_APP_OPTIONS = { TYPES::SLOTS => "updateApp(TYPES::SLOTS)",
+    TYPES::DENTIST => "updateApp(TYPES::DENTIST)"
 }
 
 # Globals
@@ -60,6 +62,7 @@ $currApp = NONE
 $currAppName = NONE
 $currAppID = NONE
 $currBundleID = NONE
+$today = Date.today()
 
 # Data globals
 $config = Hash.new
@@ -194,7 +197,6 @@ def selectAccount()
         end
 
         $currAccount = selectedAccount
-        puts "Logging in appstore with account #{$currAccount}..."
         login(selectedAccount, accounts[selectedAccount])
     end
 end
@@ -225,6 +227,8 @@ end
 
 # login
 def login(user, pass)
+    puts "Logging in ITC & Developer Portal with account #{user}..."
+    Spaceship::Portal.login(user, pass)
     Spaceship::Tunes.login(user, pass)
 end
 
@@ -249,6 +253,30 @@ def checkAccount(printMsg = true)
         return false
     end
     return true
+end
+
+# Get Statuses of all accounts
+def accountsStatus()
+    $config["accounts"].each do |user,pass|
+        dict = {}
+        liveApps = 0
+        login(user, pass)
+        apps = Spaceship::Tunes::Application.all
+
+        apps.each do |app|
+            if appStatus(app) == APPSTATUS::LIVE
+                liveApps+=1
+                next
+            end
+
+            v = app.edit_version
+            puts "#{app.name} : #{v.app_status != "" ? v.app_status : v.raw_status } (#{v.version})"
+
+        end
+        # print total apps + how many are live
+        puts "Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited"
+        pageBreak()
+    end
 end
 
 # Check app
@@ -360,7 +388,55 @@ def updateTitleToAllLanguages()
 end
 
 # Create new app
-def createNewApp()
+def createNewApp(type)
+    keepTrying = true
+    configData = $config["new#{type}"]
+    while keepTrying do
+        begin
+            puts "Enter app name:"
+            name = gets.chomp()
+
+            bundleID = "com.#{$currAccount.split("@")[0]}.#{name.downcase.gsub(" ","")}"
+            puts "Enter bundle id (default is #{bundleID}):"
+            inputBundle = gets.chomp()
+            inputBundle = bundleID if inputBundle == ""
+
+            sku = configData["sku"].concat("_#{$today.day}#{$today.month}#{$today.year}")
+            lang = configData["primaryLangauge"]
+            version = configData["version"]
+
+            # Create new app identifier in Developer Portal
+            puts "Creating a new app with name #{name} and bundle id #{inputBundle}..."
+            portalApp = Spaceship.app.create!(bundle_id: inputBundle, name: name)
+
+            # Only slots - need to upload CSR and create push norifications
+
+            # Create new app entry on ITC
+            puts "Register a new app on ITC with the following details:\nName: #{name}\nBundle ID: #{inputBundle}\nSKU: #{sku}\nPrimary language: #{lang}\nVersion: #{version}"
+            $currApp = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
+
+            # Set price tier
+            appUpdatePriceTier($currApp, configData["priceTier"])
+
+            # Set categories
+            puts "Updating categories"
+            appUpdateCatergories($currApp, configData)
+
+            # Edit version
+            appUpdateVersion($currApp, configData)
+
+            # Process completed
+            $currAppName = name
+            $currAppID = $currApp.apple_id
+            $currBundleID = inputBundle
+
+            keepTrying = false
+        rescue => e
+            putsc "Caught exception: #{e}\n\nPlease fix and retry.", "e"
+            $currApp = NONE
+        end
+        break if !keepTrying
+    end
 end
 
 # Open app to update
@@ -386,7 +462,7 @@ def updateApp(type)
 
     # prepare bullets
     puts "Preparing bullets..."
-    data = $config[(type == TYPES::SLOTS ? "updateSlots" : "updateDentist")]
+    data = $config["update#{type}"]
     bullets = data["mustBullets"]
     bulletDict = data["optionalBullets"]
     bulletsLeft = data["numberOfBullets"].to_i - bullets.length
@@ -424,6 +500,57 @@ end
 
 def appStatus(app)
     return (appIsEditable(app) ? (app.live_version != nil ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : (app.live_version != nil ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
+end
+
+def appUpdatePriceTier(app, tier)
+    puts "Updating tier..."
+    app.update_price_tier!(tier)
+end
+
+def appUpdateCatergories(app, config)
+    puts "Updating categories..."
+    details = app.details
+    details.primary_category = config["primaryCategory"]
+    details.primary_first_sub_category = config["primaryFirstSubCategory"]
+    details.primary_second_sub_category = config["primarySecondSubCategory"]
+    details.secondary_category = config["secondaryCategory"]
+    details.save!
+end
+
+def addUpdateVersion(app,config)
+    puts "Updating version info (support URL, copyright, rating - for dentist don't forget to mark made for kids on ITC, review details)..."
+    v = app.edit_version
+
+    # Set support URL
+    v.support_url['en-US'] = config["supportURL"]
+
+    # Set copyright
+    v.copyright = config["copyright"]
+
+    # Set rating
+    v.update_rating({
+        "CARTOON_FANTASY_VIOLENCE" => config["rating"][0],
+        "REALISTIC_VIOLENCE" => config["rating"][1],
+        "PROLONGED_GRAPHIC_SADISTIC_REALISTIC_VIOLENCE" => config["rating"][2],
+        "PROFANITY_CRUDE_HUMOR" => config["rating"][3],
+        "MATURE_SUGGESTIVE" => config["rating"][4],
+        "HORROR" => config["rating"][5],
+        "MEDICAL_TREATMENT_INFO" => config["rating"][6],
+        "ALCOHOL_TOBACCO_DRUGS" => config["rating"][7],
+        "GAMBLING" => config["rating"][8],
+        "SEXUAL_CONTENT_NUDITY" => config["rating"][9],
+        "GRAPHIC_SEXUAL_CONTENT_NUDITY" => config["rating"][10],
+        "UNRESTRICTED_WEB_ACCESS" => config["rating"][11],
+        "GAMBLING_CONTESTS" => config["rating"][12]
+    })
+
+    # Set review details
+    v.review_email = $currAccount
+    v.review_first_name = config["reviewFirstName"][rand(config["reviewFirstName"].length)]
+    v.review_last_name = config["reviewLastName"][rand(config["reviewLastName"].length)]
+    v.review_phone_number = config["reviewPhonePrefix"] + rand().to_s().split(".",2)[1][1..config["reviewPhoneDigits"]]
+
+    v.save!
 end
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
