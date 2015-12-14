@@ -19,17 +19,26 @@ module APPSTATUS
     LIVE_EDITABLE = 3
 end
 
+module MENUTITLE
+    NO_TITLE = 0
+    GENERAL_TITLE = 1
+    ACCOUNT_TITLE = 2
+    APPS_TITLE = 3
+end
 
 
 # Menu consts
-MAIN_MENU_OPTIONS = { "Select account & app" => "selectAccountAndApp",
+MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
+    "Select account & app" => "selectAccountAndApp",
     "Select account" => "selectAccount",
     "Select app" => "selectApp",
     "Accounts status (contol table, takes several minutes...)" => "accountsStatus",
-    "Keywords menu" => "keywordsMenu",
-    "Titles menu" => "titlesMenu",
+    "----- ACCOUNT MENU -----" => MENUTITLE::ACCOUNT_TITLE,
     "Create new app in account" => "createNewAppInAccount",
     "Update app in account (fill in what's new in all languages)" => "updateInAccount",
+    "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
+    "Keywords menu" => "keywordsMenu",
+    "Titles menu" => "titlesMenu",
     "Log out from account" => "logout",
     "Exit" => "exit"
 }
@@ -118,8 +127,12 @@ def putsc (msg, type = "i")
             "\e[31m#{msg}\e[0m"
         when "blink"
             "\e[5m#{msg}\e[0m"
+        when "bold"
+            "\e[1m#{msg}\e[0m"
         when "pink"
             "\e[35m#{msg}\e[0m"
+        when "red"
+            "\e[31m#{msg}\e[0m"
         else
             msg
     end
@@ -576,10 +589,31 @@ def showMenu(dict, backOption=true)
     printHeaders()
     printAppStatus() if !backOption
 
+    funcs = dict.clone()
+
     # menu
     length = dict.length-1
+    j=0
+    color = "regular"
     for i in 0..length
-        puts "[#{i.to_s.rjust(2)}] - #{dict.keys[i]}"
+        case dict[dict.keys[i]]
+        when MENUTITLE::GENERAL_TITLE
+            putsc "#{dict.keys[i]}", "bold"
+
+        when MENUTITLE::ACCOUNT_TITLE
+            color = $currAccount == NONE ? "red" : "bold"
+            putsc "#{dict.keys[i]}", color
+            color = "regular" if color == "bold"
+
+        when MENUTITLE::APPS_TITLE
+            color = $currApp == NONE ? "red" : "regular"
+            putsc "#{dict.keys[i]}", color
+            color = "regular" if color == "bold"
+
+        else
+            putsc "[#{j.to_s.rjust(2)}] - #{dict.keys[i]}", color
+            j+=1
+        end
     end
 
     if backOption
@@ -594,7 +628,7 @@ def showMenu(dict, backOption=true)
         return false
     end
 
-    eval(dict[dict.keys[option]])
+    eval(funcs[funcs.keys[option]])
     pageBreak()
     return true
 end
@@ -641,7 +675,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.3 - By Liran Cohen"
+puts "Appstore Control Center V1.5 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
