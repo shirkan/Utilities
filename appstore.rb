@@ -599,16 +599,19 @@ def showMenu(dict, backOption=true)
         case dict[dict.keys[i]]
         when MENUTITLE::GENERAL_TITLE
             putsc "#{dict.keys[i]}", "bold"
+            funcs.delete(dict.keys[i])
 
         when MENUTITLE::ACCOUNT_TITLE
             color = $currAccount == NONE ? "red" : "bold"
             putsc "#{dict.keys[i]}", color
             color = "regular" if color == "bold"
+            funcs.delete(dict.keys[i])
 
         when MENUTITLE::APPS_TITLE
             color = $currApp == NONE ? "red" : "regular"
             putsc "#{dict.keys[i]}", color
             color = "regular" if color == "bold"
+            funcs.delete(dict.keys[i])
 
         else
             putsc "[#{j.to_s.rjust(2)}] - #{dict.keys[i]}", color
