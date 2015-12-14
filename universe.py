@@ -58,11 +58,11 @@ browser.set_handle_equiv( True )
 browser.set_handle_redirect( True )
 browser.set_handle_referer( True )
 browser.set_handle_robots( False )
-browser.addheaders = [ ( 'User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1' ) ]
+browser.addheaders = [ ( 'User-agent', 'Mozilla/15.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1' ) ]
 
 # Login
 print "Logging in " + user + "..."
-res = browser.open(LOGIN_URL, timeout=5.0)
+res = browser.open(LOGIN_URL, timeout=15.0)
 browser.select_form(nr = 0)
 browser.form[LOGIN_USER_ELEMENT] = user
 browser.form[LOGIN_PASSWORD_ELEMENT] = password
@@ -70,7 +70,7 @@ res = browser.submit()
 
 # create new app
 print "Creating new game " + name + " with template of " + template + "..."
-res = browser.open(NEW_APP_URL, timeout=5.0)
+res = browser.open(NEW_APP_URL, timeout=15.0)
 browser.select_form(nr = 0)
 browser.form[APP_NAME] = name
 browser.form[TEMPLATE] = [TEMPLATE_TYPE[template],]
@@ -78,7 +78,7 @@ res = browser.submit()
 
 # get server ID
 print "Parsing ID..."
-res = browser.open(APPS_PAGE, timeout=5.0)
+res = browser.open(APPS_PAGE, timeout=15.0)
 tree = html.fromstring(res.get_data())
 table = tree.find_class('table')
 last_row = html.tostring(table[0].getchildren()[1].getchildren()[-1])
@@ -91,7 +91,7 @@ print "Server ID for game is: " + gameID
 # update flurry ID
 print "Updating flurry id " + flurry
 site = APP_PAGE_PREFIX + gameID + APP_PAGE_SUFFIX
-res = browser.open(site, timeout=5.0)
+res = browser.open(site, timeout=15.0)
 browser.select_form(nr = 0)
 
 valueToLookFor = FLURRY_DEFAULT_DENTIST if template == 'dentist' else FLURRY_DEFAULT_SLOTS
