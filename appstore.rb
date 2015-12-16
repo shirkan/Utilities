@@ -12,6 +12,8 @@ module TYPES
 end
 GAMES_TYPES = [TYPES::SLOTS, TYPES::DENTIST]
 
+CHECK_BUILDS_ON_STATUS = "Prepare for Submission"
+
 module APPSTATUS
     NOT_EXIST = 0
     LIVE = 1
@@ -285,8 +287,24 @@ def accountsStatus()
             end
 
             v = app.edit_version
-            puts "#{app.name} : #{v.app_status != nil ? v.app_status : v.raw_status } (#{v.version})"
-            f.puts ("#{app.name} : #{v.app_status != nil ? v.app_status : v.raw_status } (#{v.version})")
+            status = "#{app.name} : "
+            if v.app_status == CHECK_BUILDS_ON_STATUS
+                status += v.app_status + " (#{v.version}) "
+                buildsStatus = ""
+                builds = v.candidate_builds
+                builds.each {|b| buildsStatus+="#{b.build_version} (#{b.train_version}) " + (b.processing ? "Processing... |" : " Ready to use! |")}
+                status += buildsStatus == "" ? "No builds" : buildsStatus
+
+                if defined? builds[0].processing && !builds[0].processing
+                    v.select_build(builds[0])
+                    status += " #{builds[0].build_version} was selected."
+                end
+            else
+                status += (v.app_status != nil ? v.app_status : v.raw_status) + " (#{v.version})"
+            end
+
+            puts status
+            f.puts(status)
 
         end
         # print total apps + how many are live
