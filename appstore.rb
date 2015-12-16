@@ -37,6 +37,7 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "----- ACCOUNT MENU -----" => MENUTITLE::ACCOUNT_TITLE,
     "Create new app in account" => "createNewApp",
     "Update app in account (fill in what's new in all languages)" => "updateApp",
+    "Account status" => "accountStatus($currLogin[\"currAccount\"], $config[\"accounts\"][$currLogin[\"currAccount\"]])",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
     "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
     "Create IAP template" => "createIAPTemplate",
@@ -273,48 +274,54 @@ def accountsStatus()
     f = File.open($config["misc"]["saveTableToFile"], "w")
 
     $config["accounts"].each do |user,pass|
-        puts "Account #{user}:"
-        f.puts("Account #{user}:")
-        dict = {}
-        liveApps = 0
-        login(user, pass)
-        apps = Spaceship::Tunes::Application.all
-
-        apps.each do |app|
-            if appStatus(app) == APPSTATUS::LIVE
-                liveApps+=1
-                next
-            end
-
-            v = app.edit_version
-            status = "#{app.name} : "
-            if v.app_status == CHECK_BUILDS_ON_STATUS
-                status += v.app_status + " (#{v.version}) "
-                buildsStatus = ""
-                builds = v.candidate_builds
-                builds.each {|b| buildsStatus+="#{b.build_version} (#{b.train_version}) " + (b.processing ? "Processing... |" : " Ready to use! |")}
-                status += buildsStatus == "" ? "No builds" : buildsStatus
-
-                if defined? builds[0].processing && !builds[0].processing
-                    v.select_build(builds[0])
-                    status += " #{builds[0].build_version} was selected."
-                end
-            else
-                status += (v.app_status != nil ? v.app_status : v.raw_status) + " (#{v.version})"
-            end
-
-            puts status
-            f.puts(status)
-
-        end
-        # print total apps + how many are live
-        puts "Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited"
-        f.puts("Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited")
-        pageBreak()
-        f.puts("--------------------------------------------------")
+        accountStatus(user, pass, f)
     end
 
     f.close()
+end
+
+# print account status, outputFileDescriptor should be already opened (a descriptor)
+def accountStatus(user, pass, outputFileDescriptor=nil)
+    puts "Account #{user}:"
+    outputFileDescriptor.puts("Account #{user}:") if outputFileDescriptor!=nil
+    dict = {}
+    liveApps = 0
+    login(user, pass)
+    apps = Spaceship::Tunes::Application.all
+
+    apps.each do |app|
+        if appStatus(app) == APPSTATUS::LIVE
+            liveApps+=1
+            next
+        end
+
+        v = app.edit_version
+        status = "#{app.name} : "
+        if v.app_status == CHECK_BUILDS_ON_STATUS
+            status += v.app_status + " (#{v.version}) "
+            buildsStatus = ""
+            builds = v.candidate_builds
+            builds.each {|b| buildsStatus+="#{b.build_version} (#{b.train_version}) " + (b.processing ? "Processing... |" : " Ready to use! |")}
+            status += buildsStatus == "" ? "No builds" : buildsStatus
+
+            if defined? builds[0].processing and !builds[0].processing
+                v.select_build(builds[0])
+                status += " #{builds[0].build_version} was selected."
+                v.save!
+            end
+        else
+            status += (v.app_status != nil ? v.app_status : v.raw_status) + " (#{v.version})"
+        end
+
+        puts status
+        outputFileDescriptor.puts(status) if outputFileDescriptor!=nil
+
+    end
+    # print total apps + how many are live
+    puts "Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited"
+    outputFileDescriptor.puts("Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited") if outputFileDescriptor!=nil
+    pageBreak()
+    outputFileDescriptor.puts("--------------------------------------------------") if outputFileDescriptor!=nil
 end
 
 # Check app
