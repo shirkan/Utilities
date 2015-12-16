@@ -26,7 +26,6 @@ module MENUTITLE
     APPS_TITLE = 3
 end
 
-
 # Menu consts
 MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Select account & app" => "selectAccountAndApp",
@@ -34,9 +33,12 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Select app" => "selectApp",
     "Accounts status (contol table, takes several minutes...)" => "accountsStatus",
     "----- ACCOUNT MENU -----" => MENUTITLE::ACCOUNT_TITLE,
-    "Create new app in account" => "createNewAppInAccount",
-    "Update app in account (fill in what's new in all languages)" => "updateInAccount",
+    "Create new app in account" => "createNewApp",
+    "Update app in account (fill in what's new in all languages)" => "updateApp",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
+    "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
+    "Create IAP template" => "createIAPTemplate",
+    "Change app type" => "selectType",
     "Keywords menu" => "keywordsMenu",
     "Titles menu" => "titlesMenu",
     "Log out from account" => "logout",
@@ -44,7 +46,7 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
 }
 
 KEYWORDS_MENU_OPTIONS = { "Get current keywords" => "getKeywords",
-    "Update generic keywords" => "keywordsUpdateMenu",
+    "Update generic keywords" => "updateGenericKeywords",
     "Update keywords from file" => "updateKeywordsFromFile"
 }
 
@@ -53,24 +55,15 @@ TITLES_MENU_OPTIONS = { "Get current titles" => "getTitles",
     "Update titles from file" => "updateTitlesFromFile"
 }
 
-UPDATE_GENERIC_KEYWORDS_OPTIONS = { TYPES::SLOTS => "updateGenericKeywords(TYPES::SLOTS)",
-    TYPES::DENTIST => "updateGenericKeywords(TYPES::DENTIST)"
-}
-
-CREATE_NEW_APP_OPTIONS = { TYPES::SLOTS => "createNewApp(TYPES::SLOTS)",
-    TYPES::DENTIST => "createNewApp(TYPES::DENTIST)"
-}
-
-UPDATE_APP_OPTIONS = { TYPES::SLOTS => "updateApp(TYPES::SLOTS)",
-    TYPES::DENTIST => "updateApp(TYPES::DENTIST)"
-}
-
 # Globals
-$currAccount = NONE
-$currApp = NONE
-$currAppName = NONE
-$currAppID = NONE
-$currBundleID = NONE
+$currLogin = { "currAccount" => NONE,
+    "currApp" => NONE,
+    "currAppName" => NONE,
+    "currAppID" => NONE,
+    "currBundleID" => NONE,
+    "currAppType" => NONE
+}
+
 $today = Date.today()
 
 # Data globals
@@ -103,6 +96,7 @@ def readDictFromFile(file, delim = "=")
                 hash[key] = value
             end
         end
+        dict[currSubject] = hash if currSubject != ""
     end
     return dict
 end
@@ -180,7 +174,7 @@ end
 # Select account
 def selectAccount()
     pageBreak()
-    puts "Current logged account: " + $currAccount
+    puts "Current logged account: " + $currLogin["currAccount"]
     puts "Select account: "
     accounts = $config["accounts"]
     keys = accounts.keys
@@ -197,21 +191,29 @@ def selectAccount()
 
     selectedAccount = keys[option]
 
-    if $currAccount == selectedAccount
-        puts "Already logged in with #{$currAccount}. Refresh connection? (y/[n])"
+    if $currLogin["currAccount"] == selectedAccount
+        puts "Already logged in with #{$currLogin["currAccount"]}. Refresh connection? (y/[n])"
         option = gets.chomp()
         if option == "y" or option == "Y"
             puts "Refreshing connection..."
             login(selectedAccount, accounts[selectedAccount])
         end
     else
-        if $currAccount != NONE
+        if $currLogin["currAccount"] != NONE
             logout()
         end
 
-        $currAccount = selectedAccount
         login(selectedAccount, accounts[selectedAccount])
     end
+end
+
+# Set current app
+def setCurrentApp(app, name, apple_id, bundle_id, type)
+    $currLogin["currApp"] = app
+    $currLogin["currAppName"] = name
+    $currLogin["currAppID"] = apple_id
+    $currLogin["currBundleID"] = bundle_id
+    $currLogin["currAppType"] = type
 end
 
 # Select app
@@ -232,10 +234,8 @@ def selectApp()
         return
     end
 
-    $currAppName = all_apps[option].name
-    $currAppID =  all_apps[option].apple_id
-    $currBundleID = all_apps[option].bundle_id
-    $currApp = Spaceship::Tunes::Application.find($currAppID)
+    setCurrentApp(Spaceship::Tunes::Application.find(all_apps[option].apple_id), all_apps[option].name, all_apps[option].apple_id, all_apps[option].bundle_id, NONE)
+    selectType()
 end
 
 # login
@@ -243,15 +243,12 @@ def login(user, pass)
     puts "Logging in ITC & Developer Portal with account #{user}..."
     Spaceship::Portal.login(user, pass)
     Spaceship::Tunes.login(user, pass)
+    $currLogin["currAccount"] = user
 end
 
 # logout
 def logout()
-    $currAccount = NONE
-    $currApp = NONE
-    $currAppName = NONE
-    $currAppID = NONE
-    $currBundleID = NONE
+    $currLogin.each_key {|k| $currLogin[k] = NONE}
 end
 
 # exit
@@ -261,7 +258,7 @@ end
 
 # Check account
 def checkAccount(printMsg = true)
-    if $currAccount == NONE
+    if $currLogin["currAccount"] == NONE
         putsc "Please login with an account first", "e" if printMsg
         return false
     end
@@ -270,7 +267,12 @@ end
 
 # Get Statuses of all accounts
 def accountsStatus()
+    puts "Saving the following output also to #{$config["misc"]["saveTableToFile"]}..."
+    f = File.open($config["misc"]["saveTableToFile"], "w")
+
     $config["accounts"].each do |user,pass|
+        puts "Account #{user}:"
+        f.puts("Account #{user}:")
         dict = {}
         liveApps = 0
         login(user, pass)
@@ -283,18 +285,23 @@ def accountsStatus()
             end
 
             v = app.edit_version
-            puts "#{app.name} : #{v.app_status != "" ? v.app_status : v.raw_status } (#{v.version})"
+            puts "#{app.name} : #{v.app_status != nil ? v.app_status : v.raw_status } (#{v.version})"
+            f.puts ("#{app.name} : #{v.app_status != nil ? v.app_status : v.raw_status } (#{v.version})")
 
         end
         # print total apps + how many are live
         puts "Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited"
+        f.puts("Total #{apps.count} Applications, #{liveApps} are solely live, #{apps.count-liveApps} are being edited")
         pageBreak()
+        f.puts("--------------------------------------------------")
     end
+
+    f.close()
 end
 
 # Check app
 def checkApp(printMsg = true)
-    if $currApp == NONE
+    if $currLogin["currApp"] == NONE
         putsc "Please select app first", "e" if printMsg
         return false
     end
@@ -303,13 +310,13 @@ end
 
 # Get keywords
 def getKeywords()
-    v = appIsEditable($currApp) ? $currApp.edit_version : $currApp.live_version
+    v = appIsEditable($currLogin["currApp"]) ? $currLogin["currApp"].edit_version : $currLogin["currApp"].live_version
     puts v.keywords()
 end
 
 # Update keywords in app
 def updateKeywords(keywordsList)
-    v = $currApp.edit_version
+    v = $currLogin["currApp"].edit_version
 
     i = 1
     skipped = 0
@@ -332,12 +339,13 @@ def updateKeywords(keywordsList)
 end
 
 # Update keywords from generic keywords files
-def updateGenericKeywords(type)
-    if !appIsEditable($currApp)
+def updateGenericKeywords()
+    if !appIsEditable($currLogin["currApp"])
         putsc "Cannot update keywords of live apps", "e"
         return
     end
 
+    type = $currLogin["currAppType"]
     if !GAMES_TYPES.include?(type)
         putsc "No such type #{type}"
         return
@@ -350,7 +358,7 @@ end
 
 # Update keywords from custom keywords files
 def updateKeywordsFromFile()
-    if !appIsEditable($currApp)
+    if !appIsEditable($currLogin["currApp"])
         putsc "Cannot update keywords of live apps", "e"
         return
     end
@@ -366,7 +374,7 @@ end
 
 # Get titles
 def getTitles()
-    names = $currApp.details.name
+    names = $currLogin["currApp"].details.name
 
     #workaround for now
     originalNames = names.original_array
@@ -381,7 +389,7 @@ def updateTitleToAllLanguages()
     puts "Please enter title to update in all languages:"
     title = gets.chomp()
 
-    details = $currApp.details
+    details = $currLogin["currApp"].details
     names = details.name
     #workaround for now
     originalNames = names.original_array
@@ -401,15 +409,18 @@ def updateTitleToAllLanguages()
 end
 
 # Create new app
-def createNewApp(type)
+def createNewApp()
+    selectType()
+    type = $currLogin["currAppType"]
     keepTrying = true
     configData = $config["new#{type}"]
+
     while keepTrying do
         begin
             puts "Enter app name:"
             name = gets.chomp()
 
-            bundleID = "com.#{$currAccount.split("@")[0]}.#{name.downcase.gsub(" ","")}"
+            bundleID = "com.#{$currLogin["currAccount"].split("@")[0]}.#{name.downcase.gsub(" ","")}"
             puts "Enter bundle id (default is #{bundleID}):"
             inputBundle = gets.chomp()
             inputBundle = bundleID if inputBundle == ""
@@ -426,49 +437,52 @@ def createNewApp(type)
 
             # Create new app entry on ITC
             puts "Register a new app on ITC with the following details:\nName: #{name}\nBundle ID: #{inputBundle}\nSKU: #{sku}\nPrimary language: #{lang}\nVersion: #{version}"
-            $currApp = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
+            app = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
+            setCurrentApp(app, name, app.apple_id, inputBundle, type)
 
             # Set price tier
-            appUpdatePriceTier($currApp, configData["priceTier"])
+            appUpdatePriceTier($currLogin["currApp"], configData["priceTier"])
 
             # Set categories
             puts "Updating categories"
-            appUpdateCatergories($currApp, configData)
+            appUpdateCatergories($currLogin["currApp"], configData)
+
+            # Upload screenshots
+
+            # Upload icon
 
             # Edit version
-            appUpdateVersion($currApp, configData)
+            updateNewAppVersion()
 
             # Process completed
-            $currAppName = name
-            $currAppID = $currApp.apple_id
-            $currBundleID = inputBundle
-
             keepTrying = false
         rescue => e
             putsc "Caught exception: #{e}\n\nPlease fix and retry.", "e"
-            $currApp = NONE
+            setCurrentApp(NONE, NONE, NONE, NONE, NONE)
         end
         break if !keepTrying
     end
 end
 
 # Open app to update
-def updateApp(type)
-    currStatus = appStatus($currApp)
+def updateApp()
+    currStatus = appStatus($currLogin["currApp"])
     if currStatus == APPSTATUS::NOT_EXIST or currStatus == APPSTATUS::EDITABLE
-        putsc "#{$currAppName} has no live versions and cannot be updated.", "e"
+        putsc "#{$currLogin["currAppName"]} has no live versions and cannot be updated.", "e"
         return
     end
+
+    type = $currLogin["currAppType"]
 
     # we need to create a new version
     if currStatus == APPSTATUS::LIVE
         puts "Creating new version..."
-        currVer = $currApp.live_version.version
+        currVer = $currLogin["currApp"].live_version.version
         major,minor = currVer.split(".")
         minor = minor.to_i + 1
         newVer = "#{major}.#{minor}"
         puts "Current version is #{currVer}, opening a new version #{newVer}..."
-        $currApp.create_version!(newVer)
+        $currLogin["currApp"].create_version!(newVer)
     else
         puts "Already has an editable version..."
     end
@@ -490,17 +504,73 @@ def updateApp(type)
 
     # fill in bullets in all what's new languages
     puts "Filling what's new in all languages..."
-    v = $currApp.edit_version
+    v = $currLogin["currApp"].edit_version
     v.release_notes.keys.each do |lang|
         v.release_notes[lang] = bullets
     end
 
     # save
-    puts "Saving app info..."
+    puts "Saving app info on ITC..."
     v.save!
     puts "Done."
 end
 
+# Update new app details
+def updateNewAppVersion()
+    app = $currLogin["currApp"]
+    type = $currLogin["currAppType"]
+    config = $config["new#{type}"]
+
+    puts "Updating version info for type #{type} (support URL, copyright, rating, review details, localizations, descriptions, keywords)..."
+    puts "Don't forget to mark made for kids on ITC!!" if type == TYPES::DENTIST
+    v = app.edit_version
+
+    # Set support URL
+    v.support_url.keys.each {|k| v.support_url[k] = config["supportURL"]}
+
+    # Set copyright
+    v.copyright = config["copyright"]
+
+    # Set rating
+    v.update_rating( Hash[$config["itunesCriterias"]["ratings"].zip config["rating"].map! {|k| k.to_i}] )
+
+    # Set review details
+    v.review_email = $currLogin["currAccount"]
+    v.review_first_name = config["reviewFirstName"][rand(config["reviewFirstName"].length)]
+    v.review_last_name = config["reviewLastName"][rand(config["reviewLastName"].length)]
+    v.review_phone_number = config["reviewPhonePrefix"] + rand().to_s().split(".",2)[1][1..config["reviewPhoneDigits"].to_i]
+
+    # Open langauges in new ver and place descriptions & keywords
+    v.create_languages(config["localizations"])
+    config["localizations"].each do |lang|
+        v.description[lang] = config["description"].gsub("\\n","\n")
+        v.keywords[lang] = $config["generic#{type}Keywords"][lang] if defined? $config["generic#{type}Keywords"][lang]
+    end
+
+    v.save!
+    puts "Done saving details on ITC."
+end
+
+#Create IAP template page
+def createIAPTemplate()
+    filename = "#{$currLogin["currAppName"]}.iap.txt"
+    f = File.open(filename, "w")
+
+    config = $config["new#{$currLogin["currAppType"]}"]
+    sku = appGetSKU($currLogin["currApp"])
+
+    puts "Creating IAP template in file \"#{filename}\""
+
+    # Write headers
+    f.puts($config["itunesCriterias"]["iapHeaders"].join("\t"))
+
+    for i in 0..config["iapProducts"].length-1
+        prodId = "#{$currLogin["currBundleID"]}.#{config["iapProducts"][i]}"
+        f.puts("#{sku}\t#{prodId}\t#{config["iapProducts"][i]}\t#{config["iapTypes"][i]}\tyes\t#{config["iapPriceTiers"][i]}\t#{config["iapProducts"][i]}\t#{config["iapDescriptions"][i]}\t#{config["iapScreenshotPath"]}")
+    end
+
+    puts "Done."
+end
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -530,42 +600,9 @@ def appUpdateCatergories(app, config)
     details.save!
 end
 
-def addUpdateVersion(app,config)
-    puts "Updating version info (support URL, copyright, rating - for dentist don't forget to mark made for kids on ITC, review details)..."
-    v = app.edit_version
-
-    # Set support URL
-    v.support_url['en-US'] = config["supportURL"]
-
-    # Set copyright
-    v.copyright = config["copyright"]
-
-    # Set rating
-    v.update_rating({
-        "CARTOON_FANTASY_VIOLENCE" => config["rating"][0],
-        "REALISTIC_VIOLENCE" => config["rating"][1],
-        "PROLONGED_GRAPHIC_SADISTIC_REALISTIC_VIOLENCE" => config["rating"][2],
-        "PROFANITY_CRUDE_HUMOR" => config["rating"][3],
-        "MATURE_SUGGESTIVE" => config["rating"][4],
-        "HORROR" => config["rating"][5],
-        "MEDICAL_TREATMENT_INFO" => config["rating"][6],
-        "ALCOHOL_TOBACCO_DRUGS" => config["rating"][7],
-        "GAMBLING" => config["rating"][8],
-        "SEXUAL_CONTENT_NUDITY" => config["rating"][9],
-        "GRAPHIC_SEXUAL_CONTENT_NUDITY" => config["rating"][10],
-        "UNRESTRICTED_WEB_ACCESS" => config["rating"][11],
-        "GAMBLING_CONTESTS" => config["rating"][12]
-    })
-
-    # Set review details
-    v.review_email = $currAccount
-    v.review_first_name = config["reviewFirstName"][rand(config["reviewFirstName"].length)]
-    v.review_last_name = config["reviewLastName"][rand(config["reviewLastName"].length)]
-    v.review_phone_number = config["reviewPhonePrefix"] + rand().to_s().split(".",2)[1][1..config["reviewPhoneDigits"]]
-
-    v.save!
+def appGetSKU(app)
+    return app.vendor_id
 end
-
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Menu functions
@@ -573,14 +610,15 @@ end
 # Print headers
 def printHeaders()
     # headers
-        puts "Current logged account: " + $currAccount
-        puts "Current selected app: " + $currAppName
+        puts "Current logged account: " + $currLogin["currAccount"]
+        puts "Current selected app: " + $currLogin["currAppName"]
+        puts "Current app type: " + $currLogin["currAppType"] if $currLogin["currAppType"] != NONE
 end
 
 # App status
 def printAppStatus()
     return if !checkApp(false)
-    appIsEditable($currApp) ? (putsc "App is editable", "blink") : (putsc "App is live", "pink")
+    appIsEditable($currLogin["currApp"]) ? (putsc "App is editable", "blink") : (putsc "App is live", "pink")
     puts ""
 end
 
@@ -602,13 +640,13 @@ def showMenu(dict, backOption=true)
             funcs.delete(dict.keys[i])
 
         when MENUTITLE::ACCOUNT_TITLE
-            color = $currAccount == NONE ? "red" : "bold"
+            color = $currLogin["currAccount"] == NONE ? "red" : "bold"
             putsc "#{dict.keys[i]}", color
             color = "regular" if color == "bold"
             funcs.delete(dict.keys[i])
 
         when MENUTITLE::APPS_TITLE
-            color = $currApp == NONE ? "red" : "regular"
+            color = $currLogin["currApp"] == NONE ? "red" : "bold"
             putsc "#{dict.keys[i]}", color
             color = "regular" if color == "bold"
             funcs.delete(dict.keys[i])
@@ -651,10 +689,6 @@ def keywordsMenu()
     end
 end
 
-def keywordsUpdateMenu()
-    showMenu(UPDATE_GENERIC_KEYWORDS_OPTIONS)
-end
-
 # Titles menu
 def titlesMenu()
     loop do
@@ -663,22 +697,24 @@ def titlesMenu()
     end
 end
 
-# Create new app in account
-def createNewAppInAccount()
-    return if !checkAccount
-    showMenu(CREATE_NEW_APP_OPTIONS)
-end
+# Select type
+def selectType()
+    pageBreak()
+    puts "Select type:"
 
-# Update app in account
-def updateInAccount()
-    return if !checkAccount or !checkApp
-    showMenu(UPDATE_APP_OPTIONS)
+    for i in 0..GAMES_TYPES.length-1
+        putsc "[#{i.to_s.rjust(1)}] - #{GAMES_TYPES[i]}"
+    end
+
+    puts "Select option:"
+    option = readNumber(0, GAMES_TYPES.length-1)
+    $currLogin["currAppType"] = GAMES_TYPES[option]
 end
 
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.5 - By Liran Cohen"
+puts "Appstore Control Center V1.7 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
