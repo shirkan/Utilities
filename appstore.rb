@@ -531,6 +531,9 @@ def updateNewAppVersion()
     # Set copyright
     v.copyright = config["copyright"]
 
+    # Set marketing URL
+    v.marketing_url = config["marketingURL"]
+
     # Set rating
     v.update_rating( Hash[$config["itunesCriterias"]["ratings"].zip config["rating"].map! {|k| k.to_i}] )
 
