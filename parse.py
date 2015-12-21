@@ -41,6 +41,8 @@ def createParseApp(name, user, password):
         print "Couldn't retrieve Client Key"
         print result
 
+    if "clientKey" in result and "applicationId" in result:
+        print "acc respond:" + result["applicationId"] + "," + result["clientKey"]
 
 def getCredentials(inputFile):
         accounts = {}
@@ -48,6 +50,7 @@ def getCredentials(inputFile):
             for line in inFile:
                 name, user, password = line.split()
                 accounts[name] = [user, password]
+                accounts[user] = [user, password]
         return accounts
 
 accounts = getCredentials(PASSWORDS_FILE)

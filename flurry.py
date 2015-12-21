@@ -23,7 +23,7 @@ parser.add_argument('-name', required=True, help='Game name')
 # platform name
 parser.add_argument('-platform', required=True, choices = ['ios', 'android'], help='which platform to open the game in')
 # type
-parser.add_argument('-type', required=True, choices = ['slot', 'dentist'], help='which type of game to open')
+parser.add_argument('-type', required=True, choices = ['slots', 'dentist'], help='which type of game to open')
 
 args = parser.parse_args()
 platform = args.platform
@@ -85,6 +85,9 @@ print "Parsing ID..."
 tree = html.fromstring(res.get_data())
 code = tree.find_class(CODE_CLASS)
 
-print html.tostring(code[0]).split("projectKey\">",1)[1].split("</",1)[0]
+flurryID = html.tostring(code[0]).split("projectKey\">",1)[1].split("</",1)[0]
+
+print flurryID
 
 print "Done."
+print "acc respond:" + flurryID
