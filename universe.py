@@ -107,3 +107,4 @@ if not foundFlurry:
     print "Couldn't found Flurry entry in game :("
 
 print "Done."
+print "acc respond:" + gameID
