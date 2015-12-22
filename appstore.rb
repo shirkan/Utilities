@@ -38,11 +38,11 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "----- ACCOUNT MENU -----" => MENUTITLE::ACCOUNT_TITLE,
     "Create new app in account" => "createNewApp",
     "Update app in account (fill in what's new in all languages)" => "updateApp",
-    "Update default descriptions & keywords" => "updateDefaultDescriptionAndKeywords",
     "Account status" => "accountStatus($currLogin[\"currAccount\"], $config[\"accounts\"][$currLogin[\"currAccount\"]])",
     "Log out from account" => "logout",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
     "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
+    "Update default descriptions & keywords" => "updateDefaultDescriptionAndKeywords",
     "Create push notification certificate & p12 file" => "createPushNotification",
     "Create & download provisioning file" => "createProvisioningFile",
     "Create IAP template" => "createIAPTemplate",
@@ -56,7 +56,6 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Create flurry ID" => "createFlurryID",
     "Create universe server ID" => "createUniverseID",
     "Create Parse app ID & client key" => "createParse",
-    "Enable Watchbuild for app (use only when builds are up!)" => "enableWatchbuild",
     "Select latest build" => "selectLatestBuild",
     "Submit for review" => "submitForReview",
     "Exit" => "exit"
@@ -76,7 +75,6 @@ TITLES_MENU_OPTIONS = { "Get current titles" => "getTitles",
 $currLogin = { "currAccount" => NONE,
     "currApp" => NONE,
     "currAppName" => NONE,
-    "currAppID" => NONE,
     "currBundleID" => NONE,
     "currAppType" => NONE
 }
@@ -246,10 +244,9 @@ def selectAccount()
 end
 
 # Set current app
-def setCurrentApp(app, name, apple_id, bundle_id, type)
+def setCurrentApp(app, name, bundle_id, type)
     $currLogin["currApp"] = app
     $currLogin["currAppName"] = name
-    $currLogin["currAppID"] = apple_id
     $currLogin["currBundleID"] = bundle_id
     $currLogin["currAppType"] = type
     $currIDs.each_key {|k| $currIDs[k] = NONE}
@@ -273,7 +270,7 @@ def selectApp()
         return
     end
 
-    setCurrentApp(Spaceship::Tunes::Application.find(all_apps[option].apple_id), all_apps[option].name, all_apps[option].apple_id, all_apps[option].bundle_id, NONE)
+    setCurrentApp(Spaceship::Tunes::Application.find(all_apps[option].apple_id), all_apps[option].name, all_apps[option].bundle_id, NONE)
     selectType()
 end
 
@@ -335,7 +332,7 @@ def accountStatus(user, pass, outputFileDescriptor=nil)
         v = app.edit_version
         status = "#{app.name} : "
         if v.app_status == CHECK_BUILDS_ON_STATUS
-            status += v.app_status + " (#{v.version}) "
+            status += v.app_status + " (#{v.version}) - "
             buildsStatus = ""
             builds = v.candidate_builds
             builds.each {|b| buildsStatus+="#{b.build_version} (#{b.train_version}) " + (b.processing ? "Processing... |" : " Ready to use! |")}
@@ -347,7 +344,7 @@ def accountStatus(user, pass, outputFileDescriptor=nil)
                 v.save!
             end
         else
-            status += (not v.app_status.nil? ? v.app_status : v.raw_status) + " (#{v.version})"
+            status += ((not v.app_status.nil?) ? v.app_status : v.raw_status).capitalize() + " (#{v.version})"
         end
 
         puts status
@@ -498,7 +495,7 @@ def createNewApp()
             # Create new app entry on ITC
             puts "Registering a new app on ITC with the following details:\nName: #{name}\nBundle ID: #{inputBundle}\nSKU: #{sku}\nPrimary language: #{lang}\nVersion: #{version}"
             itcApp = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
-            setCurrentApp(app, name, app.apple_id, inputBundle, type)
+            setCurrentApp(app, name, inputBundle, type)
 
             puts "App created succesfully on ITC and Developers Portal, no errors should occur now..."
 
@@ -530,14 +527,11 @@ def createNewApp()
             # Create IAP template
             createIAPTemplate()
 
-            # Set watchbuild to get notification when build completed processing
-            # enableWatchbuild()
-
             # Process completed
             keepTrying = false
         rescue => e
             putsc "Caught exception: #{e}\n\nPlease fix and retry.", "e"
-            setCurrentApp(NONE, NONE, NONE, NONE, NONE)
+            setCurrentApp(NONE, NONE, NONE, NONE)
         end
         break if !keepTrying
     end
@@ -788,7 +782,84 @@ def createNewBuild()
 end
 
 def createNewDentistBuild()
+    #name
+    puts "Enter game name (press enter to use \"#{$currLogin["currAppName"]}\" or enter 0 to return):"
+    name = gets().chomp()
+    return if name == "0"
+    name = $currLogin["currAppName"] if name == ""
 
+    #source
+    source = ""
+    loop do
+        puts "Enter source path or 0 to return"
+        source = gets.chomp()
+        return if source == "0"
+        source = source.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
+        if not File.exists?(source) or not File.directory?(source)
+            putsc "No such directory #{source}", "e"
+            next
+        end
+        break
+    end
+
+    #target
+    target = ""
+    loop do
+        puts "Enter target path (with duplicated prototype) or 0 to return"
+        target = gets.chomp()
+        return if target == "0"
+        target = target.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
+        if not File.exists?(target) or not File.directory?(target)
+            putsc "No such directory #{target}", "e"
+            next
+        end
+        break
+    end
+
+    #bundle ID
+    puts "Enter bundle ID (press enter to use \"#{$currLogin["currBundleID"]}\" or enter 0 to return):"
+    bundleID = gets().chomp()
+    return if bundleID == "0"
+    bundleID = $currLogin["currBundleID"] if bundleID == ""
+
+    #IAP
+    puts "Enter IAP prefix (press enter to use \"#{$currLogin["currBundleID"]}\" or enter 0 to return):"
+    iap = gets().chomp()
+    return if iap == "0"
+    iap = $currLogin["currBundleID"] if iap == ""
+
+    #universe ID
+    universe = ""
+    while universe == "" do
+        if $currIDs["universe"] != NONE
+            puts "Do you want to use this Universe ID #{$currIDs["universe"]} ([y]/n, 0 to return)?"
+            universe = gets().chomp()
+            return if universe == "0"
+            universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
+        else
+            puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
+            universe = gets().chomp()
+            return if universe == "0"
+            if universe == ""
+                createUniverseID()
+                universe = $currIDs["universe"]
+            end
+        end
+        $currIDs["universe"] = universe
+    end
+
+    #Ver
+    puts "Enter version (default is 1.0 or enter 0 to return):"
+    ver = gets().chomp()
+    return if ver == "0"
+    ver = "1.0" if ver == ""
+
+    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nUniverse ID:#{universe}\nVersion:#{ver}"
+    puts "Are these details correct? ([y]/n)"
+    option = gets().chomp()
+    return createNewSlotsBuildReskinIOS() if option.downcase == "n"
+
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin dentist"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -id #{universe} -ver #{ver} -run 1")
 end
 
 def createNewSlotsBuild()
@@ -879,7 +950,7 @@ def createNewSlotsBuildReskinIOS()
             puts "Do you want to use this Parse App ID #{$currIDs["parseAppID"]} ([y]/n, 0 to return)?"
             parseAppId = gets().chomp()
             return if parseAppId == "0"
-            parseAppId = $currIDs["parseAppID"] if parseClientKey.downcase == 'y' or parseAppId == ""
+            parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
@@ -1022,7 +1093,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             puts "Do you want to use this Parse App ID #{$currIDs["parseAppID"]} ([y]/n, 0 to return)?"
             parseAppId = gets().chomp()
             return if parseAppId == "0"
-            parseAppId = $currIDs["parseAppID"] if parseClientKey.downcase == 'y' or parseAppId == ""
+            parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
@@ -1148,11 +1219,6 @@ def createParse()
     puts "Parse App ID: #{$currIDs["parseAppID"]}\nParse Client Key: #{$currIDs["parseClientKey"]}"
 end
 
-def enableWatchbuild()
-    puts "Enabling Watchbuild for #{$currLogin["currBundleID"]} for user #{$currLogin["currAccount"]}..."
-    system("watchbuild -a #{$currLogin["currBundleID"]} -u #{$currLogin["currAccount"]}")
-end
-
 def selectLatestBuild()
     if not appIsEditable($currLogin["currApp"])
         putsc "App is not editable!", "e"
@@ -1187,7 +1253,7 @@ def appIsEditable(app)
 end
 
 def appStatus(app)
-    return (appIsEditable(app) ? (not app.live_version.nil? ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : (not app.live_version.nil? ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
+    return (appIsEditable(app) ? ((not app.live_version.nil?) ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : ((not app.live_version.nil?) ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
 end
 
 def appUpdatePriceTier(app, tier)
@@ -1319,7 +1385,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.10 - By Liran Cohen"
+puts "Appstore Control Center V1.11 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
