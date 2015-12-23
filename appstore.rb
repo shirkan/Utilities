@@ -5,7 +5,7 @@ require "credentials_manager"
 
 # Consts
 NONE = "none"
-INI_SETUP_FILE = "appstore.ini"
+INI_SETUP_FILE = "/Users/Shirkan/Github/AppNinjaz/Utilities/appstore.ini"
 
 module TYPES
     SLOTS = "Slots"
@@ -185,6 +185,34 @@ def execute(cmd)
     res = %x[#{cmd} 2>&1].chomp()
     puts res
     return res
+end
+
+# Read file or dir
+def readFile(msg, isDir = false)
+    path = ""
+    loop do
+        puts msg
+        path = gets.chomp()
+        return "0" if path == "0"
+        path = path.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
+
+        next if not File.exists?(path)
+
+        # Check dir correctness
+        if isDir and not File.directory?(path)
+            putsc "No such directory #{path}", "e"
+            next
+        end
+
+        # Check file correctness
+        if not isDir and not File.file?(path)
+            putsc "No such file #{path}", "e"
+            next
+        end
+
+        break
+    end
+    return path
 end
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -417,15 +445,10 @@ end
 
 # Update keywords from custom keywords files
 def updateKeywordsFromFile()
-    if !appIsEditable($currLogin["currApp"])
-        putsc "Cannot update keywords of live apps", "e"
-        return
-    end
-
     # Get file, select default if empty
-    puts "Enter file to read keywords from (default: #{$config["default"]["keywordsInputFile"]}):"
-    inputFile = gets.chomp()
-    inputFile = $config["default"]["keywordsInputFile"] if inputFile == ""
+    inputFile = readFile("Enter file to read keywords from (default: #{$config["defaults"]["keywordsInputFile"]}) or 0 to get back:")
+    inputFile = $config["defaults"]["keywordsInputFile"] if inputFile == ""
+    return if inputFile == "0"
 
     keywordsList = readDictFromFile(inputFile)
     updateKeywords(keywordsList)
@@ -441,6 +464,36 @@ def getTitles()
         lang = originalNames[i]["localeCode"]
         puts "#{lang.ljust(7)}: #{names[lang]}"
     end
+end
+
+def updateTitles(titlesList)
+    puts titlesList
+    details = $currLogin["currApp"].details
+    names = details.name
+    #workaround for now
+    originalNames = names.original_array
+
+    skipped = 0
+    changed = 0
+
+    for i in 0..originalNames.length-1
+        lang = originalNames[i]["localeCode"]
+        if not titlesList.has_key?(lang)
+            puts "Cannot find a title for #{lang}, skipping"
+            skipped+=1
+            next
+        end
+        details.name[lang] = titlesList[lang]
+        changed+=1
+    end
+
+    puts "Total skips: #{skipped}."
+    if changed > 0
+        puts "\nSaving app info..."
+        details.save!
+    end
+
+    puts "Done."
 end
 
 # Update the same title for all languages
@@ -465,6 +518,16 @@ def updateTitleToAllLanguages()
         details.save!
         puts "Done."
     end
+end
+
+def updateTitlesFromFile()
+    # Get file, select default if empty
+    inputFile = readFile("Enter file to read titles from (default: #{$config["defaults"]["titlesInputFile"]}) or 0 to get back:")
+    inputFile = $config["defaults"]["titlesInputFile"] if inputFile == ""
+    return if inputFile == "0"
+
+    titlesList = readDictFromFile(inputFile)
+    updateTitles(titlesList["titles"])
 end
 
 # Create new app
@@ -675,28 +738,14 @@ def uploadIcon()
         return
     end
 
-    loop do
-        puts "Enter full path of icon file (1024x1024) or type 0 to skip"
-        path = gets.chomp()
+    path = readFile("Enter full path of icon file (1024x1024) or type 0 to skip")
+    return if path == "0"
 
-        if path.downcase == "0"
-            puts "Skipping..."
-            break
-        end
-
-        path = path.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-
-        if not File.exists?(path) or not File.file?(path)
-            putsc "No such file #{path}", "e"
-        else
-            puts "Uploading icon from #{path}..."
-            v = $currLogin["currApp"].edit_version
-            v.upload_large_icon!(path)
-            puts "Saving app info on ITC... "
-            v.save!
-            break
-        end
-    end
+    puts "Uploading icon from #{path}..."
+    v = $currLogin["currApp"].edit_version
+    v.upload_large_icon!(path)
+    puts "Saving app info on ITC... "
+    v.save!
 end
 
 def uploadScreenshots()
@@ -705,74 +754,59 @@ def uploadScreenshots()
         return
     end
 
-    loop do
-        puts "Enter full path of screenshots or type 0 to skip"
-        path = gets.chomp()
+    path = readFile("Enter full path of screenshots or type 0 to skip", true)
+    return if path == "0"
 
-        if path.downcase == "0"
-            puts "Skipping..."
-            break
-        end
-
-        path = path.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-
-        if not File.exists?(path) or not File.directory?(path)
-            putsc "No such directory #{path}", "e"
-            next
-        end
-
-        # Iterate directory and understand what type of screenshots are relevant
-        filesDict = {}
-        $config["misc"]["screenshotsDeviceFiles"].each do |deviceType|
-            $config["misc"]["screenshotsFileExtensions"].each do |fileExt|
-                localGlob = Dir.glob(path + "/" + deviceType + "-[1-#{$config["misc"]["maxScreenshots"].to_i}]" + fileExt)
-                localGlob.each do |f|
-                    key = File.basename(f, ".*")
-                    filesDict[key] = f
-                end
+    # Iterate directory and understand what type of screenshots are relevant
+    filesDict = {}
+    $config["misc"]["screenshotsDeviceFiles"].each do |deviceType|
+        $config["misc"]["screenshotsFileExtensions"].each do |fileExt|
+            localGlob = Dir.glob(path + "/" + deviceType + "-[1-#{$config["misc"]["maxScreenshots"].to_i}]" + fileExt)
+            localGlob.each do |f|
+                key = File.basename(f, ".*")
+                filesDict[key] = f
             end
         end
-
-        puts "Found #{filesDict.length} screenshots for: #{filesDict.keys.join(", ")}"
-
-        # Ask if to override all screenshots or place only missing screenshots
-        override = false
-        loop do
-            puts "Do you want to override all screenshots (overriding screenshots might take few minutes)? (y/[n])"
-            option = gets.chomp().downcase
-
-            override = (option == 'y')
-            break if option == 'y' or option == 'n' or option == ''
-        end
-
-        v = $currLogin["currApp"].edit_version
-        screenshots = v.screenshots
-        langs = screenshots.keys
-
-        # Iterate all langs
-        langs.each do |lang|
-            filesDict.each do |key|
-                (deviceType,order) = key[0].split("-")
-                order = order.to_i
-
-                # Find position of device in list of ITC device types
-                itcDevice = $config["misc"]["screenshotsDevices"][$config["misc"]["screenshotsDeviceFiles"].find_index(deviceType)]
-
-                # skip if not overriding and screenshot already exists
-                if not override and (screenshots[lang].find {|x| x.device_type == itcDevice and x.sort_order == order} != nil)
-                    puts "Skipping language #{lang} device #{deviceType} screenshot \##{order}"
-                    next
-                end
-
-                puts "Uploading screenshot for language #{lang} device #{deviceType} screenshot \##{order}"
-                v.upload_screenshot!(key[1], order, lang, itcDevice)
-            end
-        end
-
-        puts "Saving app info on ITC... "
-        v.save!
-        break
     end
+
+    puts "Found #{filesDict.length} screenshots for: #{filesDict.keys.join(", ")}"
+
+    # Ask if to override all screenshots or place only missing screenshots
+    override = false
+    loop do
+        puts "Do you want to override all screenshots (overriding screenshots might take few minutes)? (y/[n])"
+        option = gets.chomp().downcase
+
+        override = (option == 'y')
+        break if option == 'y' or option == 'n' or option == ''
+    end
+
+    v = $currLogin["currApp"].edit_version
+    screenshots = v.screenshots
+    langs = screenshots.keys
+
+    # Iterate all langs
+    langs.each do |lang|
+        filesDict.each do |key|
+            (deviceType,order) = key[0].split("-")
+            order = order.to_i
+
+            # Find position of device in list of ITC device types
+            itcDevice = $config["misc"]["screenshotsDevices"][$config["misc"]["screenshotsDeviceFiles"].find_index(deviceType)]
+
+            # skip if not overriding and screenshot already exists
+            if not override and (screenshots[lang].find {|x| x.device_type == itcDevice and x.sort_order == order} != nil)
+                puts "Skipping language #{lang} device #{deviceType} screenshot \##{order}"
+                next
+            end
+
+            puts "Uploading screenshot for language #{lang} device #{deviceType} screenshot \##{order}"
+            v.upload_screenshot!(key[1], order, lang, itcDevice)
+        end
+    end
+
+    puts "Saving app info on ITC... "
+    v.save!
 end
 
 def createNewBuild()
@@ -789,32 +823,12 @@ def createNewDentistBuild()
     name = $currLogin["currAppName"] if name == ""
 
     #source
-    source = ""
-    loop do
-        puts "Enter source path or 0 to return"
-        source = gets.chomp()
-        return if source == "0"
-        source = source.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(source) or not File.directory?(source)
-            putsc "No such directory #{source}", "e"
-            next
-        end
-        break
-    end
+    source = readFile("Enter source path or 0 to return", true)
+    return if source == "0"
 
     #target
-    target = ""
-    loop do
-        puts "Enter target path (with duplicated prototype) or 0 to return"
-        target = gets.chomp()
-        return if target == "0"
-        target = target.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(target) or not File.directory?(target)
-            putsc "No such directory #{target}", "e"
-            next
-        end
-        break
-    end
+    target = readFile("Enter target path (with duplicated prototype) or 0 to return", true)
+    return if target == "0"
 
     #bundle ID
     puts "Enter bundle ID (press enter to use \"#{$currLogin["currBundleID"]}\" or enter 0 to return):"
@@ -836,6 +850,7 @@ def createNewDentistBuild()
             universe = gets().chomp()
             return if universe == "0"
             universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
+            universe = "" if universe.downcase == 'n'
         else
             puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
             universe = gets().chomp()
@@ -857,7 +872,7 @@ def createNewDentistBuild()
     puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nUniverse ID:#{universe}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
-    return createNewSlotsBuildReskinIOS() if option.downcase == "n"
+    return createNewDentistBuild() if option.downcase == "n"
 
     execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin dentist"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -id #{universe} -ver #{ver} -run 1")
 end
@@ -877,32 +892,12 @@ def createNewSlotsBuildReskinIOS()
     name = $currLogin["currAppName"] if name == ""
 
     #source
-    source = ""
-    loop do
-        puts "Enter source path or 0 to return"
-        source = gets.chomp()
-        return if source == "0"
-        source = source.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(source) or not File.directory?(source)
-            putsc "No such directory #{source}", "e"
-            next
-        end
-        break
-    end
+    source = readFile("Enter source path or 0 to return", true)
+    return if source == "0"
 
     #target
-    target = ""
-    loop do
-        puts "Enter target path (with duplicated prototype) or 0 to return"
-        target = gets.chomp()
-        return if target == "0"
-        target = target.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(target) or not File.directory?(target)
-            putsc "No such directory #{target}", "e"
-            next
-        end
-        break
-    end
+    target = readFile("Enter target path (with duplicated prototype) or 0 to return", true)
+    return if target == "0"
 
     #bundle ID
     puts "Enter bundle ID (press enter to use \"#{$currLogin["currBundleID"]}\" or enter 0 to return):"
@@ -1005,47 +1000,17 @@ def createNewSlotsBuildReskinGFX2IOS()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
 
-    #assets
-    assets = ""
-    loop do
-        puts "Enter assets path or 0 to return"
-        assets = gets.chomp()
-        return if assets == "0"
-        assets = assets.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(assets) or not File.directory?(assets)
-            putsc "No such directory #{assets}", "e"
-            next
-        end
-        break
-    end
+    #source
+    assets = readFile("Enter assets path or 0 to return", true)
+    return if assets == "0"
 
-    #icons
-    icons = ""
-    loop do
-        puts "Enter icons path or 0 to return"
-        icons = gets.chomp()
-        return if icons == "0"
-        icons = icons.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(icons) or not File.directory?(icons)
-            putsc "No such directory #{icons}", "e"
-            next
-        end
-        break
-    end
+    #source
+    icons = readFile("Enter icons path or 0 to return", true)
+    return if icons == "0"
 
     #target
-    target = ""
-    loop do
-        puts "Enter target path (with duplicated prototype) or 0 to return"
-        target = gets.chomp()
-        return if target == "0"
-        target = target.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
-        if not File.exists?(target) or not File.directory?(target)
-            putsc "No such directory #{target}", "e"
-            next
-        end
-        break
-    end
+    target = readFile("Enter target path (with duplicated prototype) or 0 to return", true)
+    return if target == "0"
 
     #bundle ID
     puts "Enter bundle ID (press enter to use \"#{$currLogin["currBundleID"]}\" or enter 0 to return):"
@@ -1203,7 +1168,9 @@ def createUniverseID()
     end
     $currIDs["flurry"] = flurry
 
-    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["universe"] + " -name '#{name}' -flurry #{flurry} -template 'slots v3'")
+    template = ($currLogin["currAppType"] == TYPES::DENTIST ? 'dentist' : 'slots v3')
+
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["universe"] + " -name '#{name}' -flurry #{flurry} -template '#{template}'")
     $currIDs["universe"] = returnValue.split("acc respond:")[1]
     puts "Universe ID: #{$currIDs["universe"]}"
 end
