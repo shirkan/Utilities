@@ -451,7 +451,7 @@ def updateKeywordsFromFile()
     return if inputFile == "0"
 
     keywordsList = readDictFromFile(inputFile)
-    updateKeywords(keywordsList)
+    updateKeywords(keywordsList["keywords"])
 end
 
 # Get titles
