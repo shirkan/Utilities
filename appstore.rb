@@ -917,8 +917,9 @@ def createNewSlotsBuildReskinIOS()
     return if leaderboard == "0"
     leaderboard = $currLogin["currBundleID"] + ".leaderboard" if leaderboard == ""
 
-    #universe ID
+    #universe ID & Flurry
     universe = ""
+    flurry = ""
     while universe == "" do
         if $currIDs["universe"] != NONE
             puts "Do you want to use this Universe ID #{$currIDs["universe"]} ([y]/n, 0 to return)?"
@@ -932,9 +933,28 @@ def createNewSlotsBuildReskinIOS()
             if universe == ""
                 createUniverseID()
                 universe = $currIDs["universe"]
+                flurry = $currIDs["flurry"]
             end
         end
         $currIDs["universe"] = universe
+    end
+
+    while flurry == "" do
+        if $currIDs["flurry"] != NONE
+            puts "Do you want to use this Flurry ID #{$currIDs["flurry"]} ([y]/n, 0 to return)?"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+        else
+            puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            if flurry == ""
+                createFlurryID()
+                flurry = $currIDs["flurry"]
+            end
+        end
+        $currIDs["flurry"] = flurry
     end
 
     #parse ID
@@ -985,12 +1005,12 @@ def createNewSlotsBuildReskinIOS()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
+    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewSlotsBuildReskinIOS() if option.downcase == "n"
 
-    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin ios"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin ios"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
 end
 
 def createNewSlotsBuildReskinGFX2IOS()
@@ -1032,6 +1052,7 @@ def createNewSlotsBuildReskinGFX2IOS()
 
     #universe ID
     universe = ""
+    flurry = ""
     while universe == "" do
         if $currIDs["universe"] != NONE
             puts "Do you want to use this Universe ID #{$currIDs["universe"]} ([y]/n, 0 to return)?"
@@ -1045,9 +1066,28 @@ def createNewSlotsBuildReskinGFX2IOS()
             if universe == ""
                 createUniverseID()
                 universe = $currIDs["universe"]
+                flurry = $currIDs["flurry"]
             end
         end
         $currIDs["universe"] = universe
+    end
+
+    while flurry == "" do
+        if $currIDs["flurry"] != NONE
+            puts "Do you want to use this Flurry ID #{$currIDs["flurry"]} ([y]/n, 0 to return)?"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+        else
+            puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            if flurry == ""
+                createFlurryID()
+                flurry = $currIDs["flurry"]
+            end
+        end
+        $currIDs["flurry"] = flurry
     end
 
     #parse ID
@@ -1098,12 +1138,12 @@ def createNewSlotsBuildReskinGFX2IOS()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nAssets:#{assets}\nIcons:#{icons}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
+    puts "Name: #{name}\nAssets:#{assets}\nIcons:#{icons}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewSlotsBuildReskinIOS() if option.downcase == "n"
 
-    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin gfx2ios"] + " -name '#{name}' -assets '#{assets}' -icons '#{icons}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin gfx2ios"] + " -name '#{name}' -assets '#{assets}' -icons '#{icons}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
 end
 
 def createPushNotification()
