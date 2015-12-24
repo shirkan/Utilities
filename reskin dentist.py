@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 import argparse, sys, reskinutils
 
-print("iOS dentist reskinner v1.1")
+print("iOS dentist reskinner v1.2")
 
 defaultVer = "1.0"
 
@@ -19,6 +19,8 @@ parser.add_argument('-bundle', required=True, help='Bundle ID')
 parser.add_argument('-iap', required=True, help='IAP ID convention')
 # server ID
 parser.add_argument('-id', required=True, help='UNIVERSE server ID')
+# Flurry ID
+parser.add_argument('-flurry', required=True, help='Flurry app ID')
 # Version
 parser.add_argument('-ver', default = defaultVer, help='Version & build number, default is ' + defaultVer)
 # run or not?
@@ -33,10 +35,10 @@ bundle = args.bundle
 iap = args.iap
 ver = args.ver
 serverID = args.id
+flurry = args.flurry
 reskinutils.run = args.run
 
 configFile = trgDir + "/MrDentist/Classes/Constants.h"
-serverFile = trgDir + "/MrDentist/Classes/ServerManager/ServerManager.m"
 infoPlistFile = trgDir + "/MrDentist/Resources/Info.plist"
 
 # FILES REPLACEMENT
@@ -53,8 +55,8 @@ print("Done.")
 print("Replacing game assets...")
 
 dirToCopy = "/MrDentist/Resources/Image/"
-filesToCopy = ["gamescene/gameback1.png", "gamescene/gameback2.png", "gamescene/people1.png", "gamescene/people2.png", "gamescene/people3.png", "gamescene/people4.png", 
-"mainscene/btn_p1_u.png", "mainscene/btn_p2_u.png", "mainscene/btn_p3_u.png", "mainscene/btn_p4_u.png", "mainscene/btn_p1_d.png", "mainscene/btn_p2_d.png", 
+filesToCopy = ["gamescene/gameback1.png", "gamescene/gameback2.png", "gamescene/people1.png", "gamescene/people2.png", "gamescene/people3.png", "gamescene/people4.png",
+"mainscene/btn_p1_u.png", "mainscene/btn_p2_u.png", "mainscene/btn_p3_u.png", "mainscene/btn_p4_u.png", "mainscene/btn_p1_d.png", "mainscene/btn_p2_d.png",
 "mainscene/btn_p3_d.png", "mainscene/btn_p4_d.png", "mainscene/mainback.png", "mainscene/menuback.png"]
 # gamescene: gameback1.png, gameback2.png, people1-4.png
 # mainscene: btn_p1-4_d,u.png, mainback.png, menuback.png
@@ -74,7 +76,7 @@ print("Done.")
 
 # replace server ID
 print("Replacing server ID...")
-reskinutils.replaceInFile(serverFile, "<enter_server_id_here>", serverID)
+reskinutils.replaceInFile(configFile, "<enter_server_id_here>", serverID)
 print("Done.")
 
 # replace bundleID
@@ -90,6 +92,11 @@ print("Done.")
 # replace version & build
 print("Replacing version & build...")
 reskinutils.replaceInFile(infoPlistFile, "enter_version_here", ver)
+print("Done.")
+
+# replace Flurry ID
+print("Replacing flurry default ID...")
+reskinutils.replaceInFile(configFile, "<enter_flurry_app_id_here>", flurry)
 print("Done.")
 
 # END OF CODE REPLACEMENT

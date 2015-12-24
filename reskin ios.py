@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 import argparse, sys, reskinutils
 
-print("iOS slots reskinner v1.5")
+print("iOS slots reskinner v1.6")
 
 defaultCoins = 5000
 defaultVer = "1.0"
@@ -22,6 +22,8 @@ parser.add_argument('-leaderboard', required=True, help='Leaderboard ID')
 parser.add_argument('-iap', required=True, help='IAP ID convention')
 # server ID
 parser.add_argument('-id', required=True, help='UNIVERSE server ID')
+# Flurry ID
+parser.add_argument('-flurry', required=True, help='Flurry app ID')
 #Parse app ID
 parser.add_argument('-parseid', required=True, help='Parse app ID')
 #Parse client key
@@ -44,6 +46,7 @@ iap = args.iap
 serverID = args.id
 parseid = args.parseid
 parseck = args.parseck
+flurry = args.flurry
 coins = args.coins
 ver = args.ver
 reskinutils.run = args.run
@@ -101,7 +104,7 @@ srcIconFiles = ["/AppIcon57x57.png", "/AppIcon57x57@2x.png", "/AppIcon72x72.png"
 trgIconFiles = ["/SimpleSlots/artwork/icon.png", "/SimpleSlots/artwork/icon@2x.png", "/SimpleSlots/artwork/icon-ipad.png", "/SimpleSlots/artwork/icon-ipad@2x.png"]
 
 for i in range(0, len(srcIconFiles)):
-	reskinutils.copyFilesByName(srcDir + srcIconFiles[i], trgDir + trgIconFiles[i])
+    reskinutils.copyFilesByName(srcDir + srcIconFiles[i], trgDir + trgIconFiles[i])
 reskinutils.checkCopy(4)
 print("Done.")
 
@@ -126,7 +129,7 @@ print("Done.")
 
 # replace server ID
 print("Replacing server ID...")
-reskinutils.replaceInFile(serverFile, "<enter_server_id_here>", serverID)
+reskinutils.replaceInFile(configFile, "<enter_server_id_here>", serverID)
 print("Done.")
 
 # replace bundleID
@@ -146,12 +149,17 @@ print("Done.")
 
 # replace Parse ID
 print("Replacing parse ID...")
-reskinutils.replaceInFile(appdelegateFile, "<enter_parse_app_id_here>", parseid)
+reskinutils.replaceInFile(configFile, "<enter_parse_app_id_here>", parseid)
 print("Done.")
 
 # replace Parse client key
 print("Replacing parse client key...")
-reskinutils.replaceInFile(appdelegateFile, "<enter_parse_client_key_here>", parseck)
+reskinutils.replaceInFile(configFile, "<enter_parse_client_key_here>", parseck)
+print("Done.")
+
+# replace Flurry ID
+print("Replacing flurry default ID...")
+reskinutils.replaceInFile(configFile, "<enter_flurry_app_id_here>", flurry)
 print("Done.")
 
 # END OF CODE REPLACEMENT

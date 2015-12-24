@@ -2,7 +2,7 @@
 import argparse, sys, reskinutils, glob
 from reskinutils import reskinPrint
 
-print("Graphics 2 iOS slots reskinner v1.0")
+print("Graphics 2 iOS slots reskinner v1.1")
 
 defaultCoins = 5000
 defaultVer = "1.0"
@@ -29,6 +29,8 @@ parser.add_argument('-id', required=True, help='UNIVERSE server ID')
 parser.add_argument('-parseid', required=True, help='Parse app ID')
 #Parse client key
 parser.add_argument('-parseck', required=True, help='Parse client key')
+# Flurry ID
+parser.add_argument('-flurry', required=True, help='Flurry app ID')
 # Coins
 parser.add_argument('-coins', default = defaultCoins, help='Initial coins amount, default is ' + str(defaultCoins))
 # Version
@@ -48,13 +50,12 @@ iap = args.iap
 serverID = args.id
 parseid = args.parseid
 parseck = args.parseck
+flurry = args.flurry
 coins = args.coins
 ver = args.ver
 reskinutils.run = args.run
 
 configFile = trgDir + "/SimpleSlots/configure.h"
-serverFile = trgDir + "/SimpleSlots/ServerManager.m"
-appdelegateFile = trgDir + "/SimpleSlots/AppDelegate.m"
 infoPlistFile = trgDir + "/SimpleSlots/PartySlots-Info.plist"
 
 # FILES REPLACEMENT
@@ -89,7 +90,7 @@ print("Replacing reskin assets in artwork...")
 dirToCopy = "/SimpleSlots/artwork/reskin"
 subdirs = ["/LevelSelect", "/lvl1", "/lvl2", "/lvl3", "/lvl4"]
 for i in range(0, len(subdirs)):
-	reskinutils.copyFilesByGlob(assets + subdirs[i] + "/*.png", trgDir + dirToCopy + subdirs[i])
+    reskinutils.copyFilesByGlob(assets + subdirs[i] + "/*.png", trgDir + dirToCopy + subdirs[i])
 reskinutils.checkCopy(4 * 20 + 2 * 2 * 4 + 3)
 print("Done.")
 
@@ -97,10 +98,10 @@ print("Done.")
 print("Replacing feature overlay in artwork...")
 dirToCopy = "/SimpleSlots/artwork"
 if len(glob.glob(trgDir + dirToCopy + "reskin/LevelSelect/feature_overlay*.png"))>0:
-	reskinutils.copyFilesByGlob(trgDir + dirToCopy + "reskin/LevelSelect/feature_overlay*.png", trgDir + dirToCopy)
-	reskinutils.checkCopy(2)
+    reskinutils.copyFilesByGlob(trgDir + dirToCopy + "reskin/LevelSelect/feature_overlay*.png", trgDir + dirToCopy)
+    reskinutils.checkCopy(2)
 else:
-	reskinPrint("Couldn't find feature_overlay files...", "w")
+    reskinPrint("Couldn't find feature_overlay files...", "w")
 print("Done.")
 
 # replace simpleslots/artwork/icon*
@@ -110,7 +111,7 @@ srcIconFiles = ["/AppIcon57x57.png", "/AppIcon57x57@2x.png", "/AppIcon72x72.png"
 trgIconFiles = ["/SimpleSlots/artwork/icon.png", "/SimpleSlots/artwork/icon@2x.png", "/SimpleSlots/artwork/icon-ipad.png", "/SimpleSlots/artwork/icon-ipad@2x.png"]
 
 for i in range(0, len(srcIconFiles)):
-	reskinutils.copyFilesByName(icons + srcIconFiles[i], trgDir + trgIconFiles[i])
+    reskinutils.copyFilesByName(icons + srcIconFiles[i], trgDir + trgIconFiles[i])
 reskinutils.checkCopy(4)
 print("Done.")
 
@@ -135,7 +136,7 @@ print("Done.")
 
 # replace server ID
 print("Replacing server ID...")
-reskinutils.replaceInFile(serverFile, "<enter_server_id_here>", serverID)
+reskinutils.replaceInFile(configFile, "<enter_server_id_here>", serverID)
 print("Done.")
 
 # replace bundleID
@@ -155,12 +156,17 @@ print("Done.")
 
 # replace Parse ID
 print("Replacing parse ID...")
-reskinutils.replaceInFile(appdelegateFile, "<enter_parse_app_id_here>", parseid)
+reskinutils.replaceInFile(configFile, "<enter_parse_app_id_here>", parseid)
 print("Done.")
 
 # replace Parse client key
 print("Replacing parse client key...")
-reskinutils.replaceInFile(appdelegateFile, "<enter_parse_client_key_here>", parseck)
+reskinutils.replaceInFile(configFile, "<enter_parse_client_key_here>", parseck)
+print("Done.")
+
+# replace Flurry ID
+print("Replacing flurry default ID...")
+reskinutils.replaceInFile(configFile, "<enter_flurry_app_id_here>", flurry)
 print("Done.")
 
 # END OF CODE REPLACEMENT
