@@ -4,7 +4,7 @@ from random import randint
 from reskinutils import reskinPrint
 from collections import OrderedDict
 
-print("ALDG - Android Long Description Generator v1.0")
+print("ALDG - Android Long Description Generator v1.1")
 
 # Consts
 PLACEHOLDER = "!@#"     # a const for placeholder
@@ -12,7 +12,7 @@ DEFAULT_LANG = "en-us"  # default language
 MAX_REPITATIONS_PER_KEYWORD = 2     # max times of repitations per keyword
 
 # Define globals
-SECTIONS = ["Section A", "Section B", "end"]    # define sections
+SECTIONS = ["Opening", "Content", "Features", "BottomLine", "end"]    # define sections
 dataDict = {}   # dictionary which contains sentences from dict file
 pickedDict = {}     # dictionary which contain picked sentences
 description = ""    # final description
@@ -40,12 +40,14 @@ output = args.output
 def readDict(lang=""):
     global SECTIONS, dataDict
 
-	# dictFile = "aldg." + lang + ".dict"
-    dictFile = "tmp.py"
+	dictFile = "aldg." + lang + ".dict"
+ #    dictFile = "tmp.py"
 
     if not os.path.isfile(dictFile):
-        reskinutilreskinPrint("Cannot load dictionary, file not exists: " + source , "e")
+        reskinutilreskinPrint("Cannot load dictionary, file not exists: " + dictFile , "e")
         return False
+    else:
+        reskinutilreskinPrint("Found dictionary file " + dictFile)
 
     with open(dictFile) as inFile:
         sectionName = ""
@@ -87,7 +89,7 @@ def selectSentences():
                 continue
             else:
                 if not section in pickedDict:
-                    pickedDict[section] = []    
+                    pickedDict[section] = []
                 pickedDict[section].append(dataDict[section][pick])
                 pickedList.append(pick)
 
@@ -122,7 +124,7 @@ def replaceWords():
         word = keywords[randint(0, len(keywords) - 1)]
         while (totalReplacementsLeft > 0) and (bucketDict[word] == MAX_REPITATIONS_PER_KEYWORD):
             word = keywords[randint(0, len(keywords) - 1)]
-            
+
         description = description.replace(PLACEHOLDER, word, 1)
         bucketDict[word] += 1
         totalReplacementsLeft -= 1
