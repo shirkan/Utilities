@@ -39,6 +39,7 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Create new app in account" => "createNewApp",
     "Update app in account (fill in what's new in all languages)" => "updateApp",
     "Account status" => "accountStatus($currLogin[\"currAccount\"], $config[\"accounts\"][$currLogin[\"currAccount\"]])",
+    "Display credentials" => "displayCredentials",
     "Log out from account" => "logout",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
     "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
@@ -269,6 +270,10 @@ def selectAccount()
 
         login(selectedAccount, accounts[selectedAccount])
     end
+end
+
+def displayCredentials()
+    puts "Account name: #{$currLogin["currAccount"]}\nPassword: #{$config["accounts"][$currLogin["currAccount"]]}"
 end
 
 # Set current app
@@ -714,6 +719,10 @@ end
 #Create IAP template page
 def createIAPTemplate()
     filename = "#{$currLogin["currAppName"]}.iap.txt"
+    puts "Enter bundle ID for IAP (default is #{$currLogin["currBundleID"]}):"
+    bundleID = gets().chomp()
+    bundleID = $currLogin["currBundleID"] if bundleID == ""
+
     puts "Creating IAP template for #{$currLogin["currAppName"]} in file #{filename}"
 
     f = File.open(filename, "w")
@@ -725,9 +734,11 @@ def createIAPTemplate()
     f.puts($config["itunesCriterias"]["iapHeaders"].join("\t"))
 
     for i in 0..config["iapProducts"].length-1
-        prodId = "#{$currLogin["currBundleID"]}.#{config["iapProducts"][i]}"
+        prodId = "#{bundleID}.#{config["iapProducts"][i]}"
         f.puts("#{sku}\t#{prodId}\t#{config["iapProducts"][i]}\t#{config["iapTypes"][i]}\tyes\t#{config["iapPriceTiers"][i]}\t#{config["iapProducts"][i]}\t#{config["iapDescriptions"][i]}\t#{config["iapScreenshotPath"]}")
     end
+
+    f.close()
 
     puts "Done."
 end
@@ -771,42 +782,71 @@ def uploadScreenshots()
 
     puts "Found #{filesDict.length} screenshots for: #{filesDict.keys.join(", ")}"
 
-    # Ask if to override all screenshots or place only missing screenshots
-    override = false
-    loop do
-        puts "Do you want to override all screenshots (overriding screenshots might take few minutes)? (y/[n])"
-        option = gets.chomp().downcase
+    # Menu
+    puts "Select option:\n[ 0] - Fill screenshots in empty places only (no override)\n[ 1] - Override all screenshots\n[ 2] - Select localizations to override screenshots\n[ 3] - Back"
+    option = readNumber(0, 3)
+    return if option == 3
 
-        override = (option == 'y')
-        break if option == 'y' or option == 'n' or option == ''
-    end
+    override = (option >= 1 and option <= 2)
 
     v = $currLogin["currApp"].edit_version
     screenshots = v.screenshots
     langs = screenshots.keys
 
     # Iterate all langs
-    langs.each do |lang|
-        filesDict.each do |key|
-            (deviceType,order) = key[0].split("-")
-            order = order.to_i
+    if (option >= 0 and option <= 1)
+        langs.each do |lang|
+            filesDict.each do |key|
+                modified = false
+                (deviceType,order) = key[0].split("-")
+                order = order.to_i
 
-            # Find position of device in list of ITC device types
-            itcDevice = $config["misc"]["screenshotsDevices"][$config["misc"]["screenshotsDeviceFiles"].find_index(deviceType)]
+                # Find position of device in list of ITC device types
+                itcDevice = $config["misc"]["screenshotsDevices"][$config["misc"]["screenshotsDeviceFiles"].find_index(deviceType)]
 
-            # skip if not overriding and screenshot already exists
-            if not override and (screenshots[lang].find {|x| x.device_type == itcDevice and x.sort_order == order} != nil)
-                puts "Skipping language #{lang} device #{deviceType} screenshot \##{order}"
-                next
+                # skip if not overriding and screenshot already exists
+                if not override and (screenshots[lang].find {|x| x.device_type == itcDevice and x.sort_order == order} != nil)
+                    puts "Skipping language #{lang} device #{deviceType} screenshot \##{order}"
+                    next
+                end
+
+                puts "Uploading screenshot to language #{lang} device #{deviceType} screenshot \##{order}"
+                v.upload_screenshot!(key[1], order, lang, itcDevice)
+                modified = true
             end
+            if modified
+                puts "Saving app info on ITC... "
+                v.save!
+            end
+        end
+    else
+        puts "Available localizations:"
+        i = 0
+        langs.each do |lang|
+            puts "[#{i.to_s.rjust(2)}] - #{lang}"
+            i+=1
+        end
+        puts "[#{i.to_s.rjust(2)}] - Back\nEnter langs separated by commas:"
+        options = gets().chomp
+        return if options == i
 
-            puts "Uploading screenshot for language #{lang} device #{deviceType} screenshot \##{order}"
-            v.upload_screenshot!(key[1], order, lang, itcDevice)
+        puts "Uploading screenshots to localizations: #{options.split(",").map {|l| langs[l.to_i]}}"
+        options.split(",").each do |index|
+            lang = langs[index.to_i]
+            filesDict.each do |key|
+                (deviceType,order) = key[0].split("-")
+                order = order.to_i
+
+                # Find position of device in list of ITC device types
+                itcDevice = $config["misc"]["screenshotsDevices"][$config["misc"]["screenshotsDeviceFiles"].find_index(deviceType)]
+
+                puts "Uploading screenshot to language #{lang} device #{deviceType} screenshot \##{order}"
+                v.upload_screenshot!(key[1], order, lang, itcDevice)
+            end
+            puts "Saving app info on ITC... "
+            v.save!
         end
     end
-
-    puts "Saving app info on ITC... "
-    v.save!
 end
 
 def createNewBuild()
@@ -842,15 +882,15 @@ def createNewDentistBuild()
     return if iap == "0"
     iap = $currLogin["currBundleID"] if iap == ""
 
-    #universe ID
+    #universe ID & Flurry
     universe = ""
+    flurry = ""
     while universe == "" do
         if $currIDs["universe"] != NONE
             puts "Do you want to use this Universe ID #{$currIDs["universe"]} ([y]/n, 0 to return)?"
             universe = gets().chomp()
             return if universe == "0"
             universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
-            universe = "" if universe.downcase == 'n'
         else
             puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
             universe = gets().chomp()
@@ -858,9 +898,28 @@ def createNewDentistBuild()
             if universe == ""
                 createUniverseID()
                 universe = $currIDs["universe"]
+                flurry = $currIDs["flurry"]
             end
         end
         $currIDs["universe"] = universe
+    end
+
+    while flurry == "" do
+        if $currIDs["flurry"] != NONE
+            puts "Do you want to use this Flurry ID #{$currIDs["flurry"]} ([y]/n, 0 to return)?"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+        else
+            puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
+            flurry = gets().chomp()
+            return if flurry == "0"
+            if flurry == ""
+                createFlurryID()
+                flurry = $currIDs["flurry"]
+            end
+        end
+        $currIDs["flurry"] = flurry
     end
 
     #Ver
@@ -869,12 +928,12 @@ def createNewDentistBuild()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nUniverse ID:#{universe}\nVersion:#{ver}"
+    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewDentistBuild() if option.downcase == "n"
 
-    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin dentist"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -id #{universe} -ver #{ver} -run 1")
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin dentist"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -id #{universe} -flurry #{flurry} -ver #{ver} -run 1")
 end
 
 def createNewSlotsBuild()
@@ -1392,7 +1451,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.11 - By Liran Cohen"
+puts "Appstore Control Center V1.12 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
