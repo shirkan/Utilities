@@ -2,3 +2,8 @@ node_modules
 requests/*
 *.password*
 appstore.ini
+__pycache*
+google*.py*
+google/*
+tmp*
+control_table.txt
