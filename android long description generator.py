@@ -12,7 +12,7 @@ DEFAULT_LANG = "en-us"  # default language
 MAX_REPITATIONS_PER_KEYWORD = 2     # max times of repitations per keyword
 
 # Define globals
-SECTIONS = ["Opening", "Content", "Features", "BottomLine", "end"]    # define sections
+SECTIONS = ["Opening", "KeywordsContent", "GenericContent", "NoRealMoney", "DownloadNow", "Features", "BottomLine", "end"]    # define sections
 dataDict = {}   # dictionary which contains sentences from dict file
 pickedDict = {}     # dictionary which contain picked sentences
 description = ""    # final description
@@ -40,14 +40,14 @@ output = args.output
 def readDict(lang=""):
     global SECTIONS, dataDict
 
-	dictFile = "aldg." + lang + ".dict"
+    dictFile = "aldg." + lang + ".dict"
  #    dictFile = "tmp.py"
 
     if not os.path.isfile(dictFile):
-        reskinutilreskinPrint("Cannot load dictionary, file not exists: " + dictFile , "e")
+        reskinPrint("Cannot load dictionary, file not exists: " + dictFile , "e")
         return False
     else:
-        reskinutilreskinPrint("Found dictionary file " + dictFile)
+        reskinPrint("Found dictionary file " + dictFile)
 
     with open(dictFile) as inFile:
         sectionName = ""
@@ -107,7 +107,7 @@ def joinDescription():
     for section in SECTIONS[0:-1]:
             for sentence in pickedDict[section]:
                 description += sentence + " "
-            description += "\n"
+            description += "\n\n"
 
 def replaceWords():
     global picks, description
@@ -144,7 +144,7 @@ def outputDescription():
         outputFile.close()
 
 
-readDict()
+readDict(lang)
 selectSentences()
 joinDescription()
 replaceWords()
