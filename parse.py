@@ -1,9 +1,9 @@
 #!/usr/local/bin/python
-import argparse,json,httplib
+import argparse,json,httplib,os
 
 print "Parse create app script - by Liran Cohen V1.0"
 
-PASSWORDS_FILE = "parse.password"
+PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/parse.password"
 
 # Parse inputs
 parser = argparse.ArgumentParser(description='Create parse app and retrieve info')
