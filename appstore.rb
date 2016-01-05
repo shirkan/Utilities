@@ -47,13 +47,16 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Create push notification certificate & p12 file" => "createPushNotification",
     "Create & download provisioning file" => "createProvisioningFile",
     "Create IAP template" => "createIAPTemplate",
+    "Remove all localizations" => "removeAllLocalizations",
     "Change app type" => "selectType",
     "Keywords menu" => "keywordsMenu",
     "Titles menu" => "titlesMenu",
     "Upload icon" => "uploadIcon",
     "Upload screenshots" => "uploadScreenshots",
+    "Update price tier" => "appUpdatePriceTier",
+    "Update app categories" => "appUpdateCatergories",
     "----- BUILDS MENU -----" => MENUTITLE::APPS_TITLE,
-    "Create a new build for compialtion" => "createNewBuild",
+    "Create a new build for compilation" => "createNewBuild",
     "Create flurry ID" => "createFlurryID",
     "Create universe server ID" => "createUniverseID",
     "Create Parse app ID & client key" => "createParse",
@@ -380,6 +383,9 @@ def accountStatus(user, pass, outputFileDescriptor=nil)
             status += ((not v.app_status.nil?) ? v.app_status : v.raw_status).capitalize() + " (#{v.version})"
         end
 
+        status += " (Slots)" if ["casino", "slot"].any? {|x| app.name.downcase.include?(x)}
+        status += " (Dentist)" if ["dentist", "clinic"].any? {|x| app.name.downcase.include?(x)}
+
         puts status
         outputFileDescriptor.puts(status) if not outputFileDescriptor.nil?
 
@@ -571,7 +577,7 @@ def createNewApp()
             createPushNotification() if type == TYPES::SLOTS
             createProvisioningFile() if type == TYPES::SLOTS
 
-            Set price tier
+            #Set price tier
             appUpdatePriceTier($currLogin["currApp"], configData["priceTier"])
 
             # Set categories
@@ -704,11 +710,15 @@ def updateDefaultDescriptionAndKeywords()
     v = app.edit_version
 
     # Open langauges in new ver and place descriptions & keywords
-    puts "Creating localizations and placing default description & keywords..."
+    puts "Creating localizations..."
     v.create_languages(config["localizations"])
+    v.save!
+
+    puts "Placing default description & keywords..."
     config["localizations"].each do |lang|
         v.description[lang] = config["description"].gsub("\\n","\n")
-        v.keywords[lang] = $config["generic#{type}Keywords"][lang] if defined? $config["generic#{type}Keywords"][lang]
+        puts "for lang #{lang}     placing #{$config["generic#{type}Keywords"][lang]}"
+        v.keywords[lang] = $config["generic#{type}Keywords"][lang]
     end
 
     puts "Saving details..."
@@ -741,6 +751,19 @@ def createIAPTemplate()
     f.close()
 
     puts "Done."
+end
+
+def removeAllLocalizations()
+    puts "You are going to remove all localiztions - Are you sure you want to continue? (y/[n])"
+    option = gets.chomp()
+    if option == 'y' or option == 'Y'
+        app = $currLogin["currApp"]
+        v = app.edit_version
+        v.languages = []
+
+        puts "Removing localizations..."
+        v.save!
+    end
 end
 
 def uploadIcon()
@@ -796,8 +819,8 @@ def uploadScreenshots()
     # Iterate all langs
     if (option >= 0 and option <= 1)
         langs.each do |lang|
+            modified = false
             filesDict.each do |key|
-                modified = false
                 (deviceType,order) = key[0].split("-")
                 order = order.to_i
 
@@ -828,7 +851,7 @@ def uploadScreenshots()
         end
         puts "[#{i.to_s.rjust(2)}] - Back\nEnter langs separated by commas:"
         options = gets().chomp
-        return if options == i
+        return if options == i-1
 
         puts "Uploading screenshots to localizations: #{options.split(",").map {|l| langs[l.to_i]}}"
         options.split(",").each do |index|
@@ -861,6 +884,7 @@ def createNewDentistBuild()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     #source
     source = readFile("Enter source path or 0 to return", true)
@@ -949,6 +973,7 @@ def createNewSlotsBuildReskinIOS()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     #source
     source = readFile("Enter source path or 0 to return", true)
@@ -1025,12 +1050,14 @@ def createNewSlotsBuildReskinIOS()
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
+            parseAppId = NONE if parseAppId.downcase == "n"
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             if parseAppId == ""
                 createParse()
+                parseAppID = $currIDs["parseAppID"]
                 parseClientKey = $currIDs["parseClientKey"]
             end
         end
@@ -1043,6 +1070,7 @@ def createNewSlotsBuildReskinIOS()
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
             parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
+            parseClientKey = NONE if parseClientKey.downcase == "n"
         else
             puts "Enter Parse Client Key, enter 0 to return:"
             parseClientKey = gets().chomp()
@@ -1078,6 +1106,7 @@ def createNewSlotsBuildReskinGFX2IOS()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     #source
     assets = readFile("Enter assets path or 0 to return", true)
@@ -1158,6 +1187,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
+            parseAppId = NONE if parseAppId.downcase == "n"
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
@@ -1176,6 +1206,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
             parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
+            parseClientKey = NONE if parseClientKey.downcase == "n"
         else
             puts "Enter Parse Client Key, enter 0 to return:"
             parseClientKey = gets().chomp()
@@ -1236,6 +1267,7 @@ def createFlurryID()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["flurry"] + " -name '#{name}' -type #{type} -platform ios")
     $currIDs["flurry"] = returnValue.split("acc respond:")[1]
@@ -1247,6 +1279,7 @@ def createUniverseID()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     flurry = ""
     while flurry == "" do
@@ -1279,6 +1312,7 @@ def createParse()
     name = gets().chomp()
     return if name == "0"
     name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
 
     returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["parse"] + " -name '#{name}' -account #{$currLogin["currAccount"]}")
     ($currIDs["parseAppID"], $currIDs["parseClientKey"]) = returnValue.split("acc respond:")[1].split(",")
@@ -1315,19 +1349,35 @@ end
 
 # app is editable
 def appIsEditable(app)
-    return (not app.edit_version.nil?)
+    begin
+        return (not app.edit_version.nil?)
+    rescue Spaceship::Client::UnexpectedResponse
+        putsc "Connection lost...", "e"
+        setCurrentApp(NONE, NONE, NONE, NONE)
+    end
 end
 
 def appStatus(app)
-    return (appIsEditable(app) ? ((not app.live_version.nil?) ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : ((not app.live_version.nil?) ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
+    begin
+        return (appIsEditable(app) ? ((not app.live_version.nil?) ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : ((not app.live_version.nil?) ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
+    rescue Spaceship::Client::UnexpectedResponse
+        putsc "Connection lost...", "e"
+        setCurrentApp(NONE, NONE, NONE, NONE)
+    end
 end
 
-def appUpdatePriceTier(app, tier)
+def appUpdatePriceTier(app="", tier="")
+    app = $currLogin["currApp"] if app == ""
+    tier = $config["new#{$currLogin["currAppType"]}"]["priceTier"] if tier == ""
+
     puts "Updating tier..."
     app.update_price_tier!(tier)
 end
 
-def appUpdateCatergories(app, config)
+def appUpdateCatergories(app="", config="")
+    app = $currLogin["currApp"] if app == ""
+    config = $config["new#{$currLogin["currAppType"]}"] if config == ""
+
     puts "Updating categories..."
     details = app.details
     details.primary_category = config["primaryCategory"]
@@ -1451,7 +1501,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.12 - By Liran Cohen"
+puts "Appstore Control Center V1.13 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
