@@ -1,9 +1,9 @@
 #!/usr/local/bin/python
-import argparse, mechanize, cookielib, sys
+import argparse, mechanize, cookielib, sys, os
 from lxml import html
 
 # consts
-PASSWORDS_FILE = "flurry.password"
+PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/flurry.password"
 LOGIN_URL = "https://dev.flurry.com/secure/login.do"
 LOGIN_USER_ELEMENT = "loginEmail"
 LOGIN_PASSWORD_ELEMENT = "loginPassword"

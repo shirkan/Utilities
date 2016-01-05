@@ -1,9 +1,9 @@
 #!/usr/local/bin/python
-import argparse, mechanize, cookielib, sys
+import argparse, mechanize, cookielib, sys, os
 from lxml import html
 
 # consts
-PASSWORDS_FILE = "universe.password"
+PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/universe.password"
 LOGIN_URL = "http://universe.appninjaz.com/login"
 LOGIN_USER_ELEMENT = "identity"
 LOGIN_PASSWORD_ELEMENT = "password"
