@@ -70,6 +70,9 @@ def main():
             result = session_requests.post(SMOOTHREVIEW_LOGIN_URL, data = payload, headers = dict(referer = SMOOTHREVIEW_LOGIN_URL))
             if not result.ok:
                 print("ERROR! Couldn't login to Smoothreviews for account: " + cred)
+            tree = html.fromstring(result.content)
+            class_add_app_lbl = tree.find_class('add_app_lbl')
+            slots = class_add_app_lbl[0].text_content().replace("\n", "").rstrip().lstrip().split(".")[0]
 
             # Scrape url
             result = session_requests.get(SMOOTHREVIEW_SITE_URL, headers = dict(referer = SMOOTHREVIEW_SITE_URL))
@@ -80,7 +83,7 @@ def main():
             class_free = tree.find_class('free')
 
             class_text1 = class_free[0].find_class('text1')
-            print(cred + ": " + class_text1[0].text_content().replace("\n", ""))
+            print(cred + ": " + class_text1[0].text_content().replace("\n", "") + " (" + slots + ")")
 
             # Logout
             result = session_requests.get(SMOOTHREVIEW_LOGOUT_URL, headers = dict(referer = SMOOTHREVIEW_LOGOUT_URL))
