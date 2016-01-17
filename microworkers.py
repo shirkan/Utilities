@@ -13,6 +13,7 @@ PASSWORDS_FILE = "microworkers.passwords"
 MAIN_TABLE = 'employeeinfo'
 ENTRIES = 'employeelist'
 STATUS_LIVE = 'status03.png'
+STATUS_ALMOST_COMPLETED = 'status02.png'
 STATUS_COLUMN = 'employeeheadercol05'
 CAMPAIGN_NAME = 'employeeheadercol01'
 COST = 'employeeheadercol02'
@@ -30,7 +31,7 @@ def getCredentials(inputFile):
         return (user, password)
 
 def main():
-    print "Microworkers info script - by Liran Cohen V1.0"
+    print "Microworkers info script - by Liran Cohen V1.1"
 
     # Get credentials
     user, password = getCredentials(PASSWORDS_FILE)
@@ -58,19 +59,24 @@ def main():
     res = browser.open(SITE_URL, timeout=1.0)
     tree = html.fromstring(res.get_data())
     table = tree.find_class(MAIN_TABLE)
+    campaigns = 0
+    toReview = 0
 
     for entry in table[0].find_class(ENTRIES):
-        if STATUS_LIVE in html.tostring(entry.find_class(STATUS_COLUMN)[0]):
+        if (STATUS_LIVE in html.tostring(entry.find_class(STATUS_COLUMN)[0])) or (STATUS_ALMOST_COMPLETED in html.tostring(entry.find_class(STATUS_COLUMN)[0])):
             name = html.tostring(entry.find_class(CAMPAIGN_NAME)[0]).split("Year=\">",1)[1].split(":",1)[0]
             cost = html.tostring(entry.find_class(COST)[0]).split("<p>",1)[1].split("</p>",1)[0]
             progress = html.tostring(entry.find_class(PROGRESS)[0]).split("<p>",1)[1].split("</p>",1)[0].replace("<sup>","").replace("</sup>","")
             not_rated = html.tostring(entry.find_class(NOT_RATED)[0]).split("Year=\">",1)[1].split("</a>",1)[0]
             print name.ljust(40), cost.rjust(5), progress.rjust(5), not_rated.rjust(3)
+            if not_rated.isdigit():
+                toReview += int(not_rated)
+            campaigns+=1
 
     #Logout
     browser.open(LOGOUT_URL, timeout=1.0)
 
-    print "Done."
+    print "Done. (Total campaigns: " + str(campaigns) + ", Total to review: " + str(toReview) + ")"
 
 if __name__ == '__main__':
     main()
