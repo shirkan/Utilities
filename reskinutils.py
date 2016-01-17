@@ -20,7 +20,7 @@ def reskinPrint(msg, type="i", exit=False):
 # Generic copying validation by number of files to copy
 def checkCopy(itemsToCopy):
 	global itemsCopied
-	if itemsCopied != itemsToCopy:
+	if (isinstance(itemsToCopy, int) and itemsCopied != itemsToCopy) or (isinstance(itemsToCopy, list) and not itemsCopied in itemsToCopy):
 		sys.exit("Invalid number of copied items! Copied " + str(itemsCopied) + " Should be " + str(itemsToCopy))
 	itemsCopied = 0
 
