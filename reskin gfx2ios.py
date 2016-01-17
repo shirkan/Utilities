@@ -91,7 +91,7 @@ dirToCopy = "/SimpleSlots/artwork/reskin"
 subdirs = ["/LevelSelect", "/lvl1", "/lvl2", "/lvl3", "/lvl4"]
 for i in range(0, len(subdirs)):
     reskinutils.copyFilesByGlob(assets + subdirs[i] + "/*.png", trgDir + dirToCopy + subdirs[i])
-reskinutils.checkCopy(4 * 20 + 2 * 2 * 4 + 3)
+reskinutils.checkCopy([4 * 20 + 2 * 2 * 4 + 4, 4 * 20 + 2 * 2 * 4 + 3, 4 * 20 + 2 * 2 * 4])
 print("Done.")
 
 # replace simpleslots/artwork/feature_overlay*
@@ -146,7 +146,7 @@ print("Done.")
 
 # replace game name
 print("Replacing game name...")
-reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name)
+reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name.replace("&","&amp;"))
 print("Done.")
 
 # replace version & build

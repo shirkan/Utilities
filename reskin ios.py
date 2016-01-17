@@ -139,7 +139,7 @@ print("Done.")
 
 # replace game name
 print("Replacing game name...")
-reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name)
+reskinutils.replaceInFile(infoPlistFile, "enter_game_name_here", name.replace("&","&amp;"))
 print("Done.")
 
 # replace version & build
