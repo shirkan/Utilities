@@ -45,13 +45,13 @@ def createParseApp(name, user, password):
         print "acc respond:" + result["applicationId"] + "," + result["clientKey"]
 
 def getCredentials(inputFile):
-        accounts = {}
-        with open(inputFile) as inFile:
-            for line in inFile:
-                name, user, password = line.split()
-                accounts[name] = [user, password]
-                accounts[user] = [user, password]
-        return accounts
+    accounts = {}
+    with open(inputFile) as inFile:
+        for line in inFile:
+            name, user, password = line.split()
+            accounts[name] = [user, password]
+            accounts[user] = [user, password]
+    return accounts
 
 accounts = getCredentials(PASSWORDS_FILE)
 if not account in accounts:
