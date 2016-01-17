@@ -54,6 +54,9 @@ def readDict(lang=""):
         sentences = []
         for line in inFile:
 
+            if a=="":
+                continue
+
             # Check for section begin
             if line.startswith('['):
 
