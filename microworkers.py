@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import requests, mechanize, cookielib, sys
+import requests, mechanize, cookielib, sys, os
 from lxml import html
 
 # Smoothreview details
@@ -8,7 +8,7 @@ SITE_URL = "https://microworkers.com/employer.php"
 LOGIN_USER_ELEMENT = "Email"
 LOGIN_PASSWORD_ELEMENT = "Password"
 LOGOUT_URL = "https://microworkers.com/logout.php"
-PASSWORDS_FILE = "microworkers.passwords"
+PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/microworkers.passwords"
 
 MAIN_TABLE = 'employeeinfo'
 ENTRIES = 'employeelist'
@@ -19,6 +19,8 @@ CAMPAIGN_NAME = 'employeeheadercol01'
 COST = 'employeeheadercol02'
 PROGRESS = 'employeeheadercol06'
 NOT_RATED = 'employeeheadercol07'
+
+MONEY_LEFT_TAG = "clo01"
 
 def dot():
     sys.stdout.write(".")
@@ -31,7 +33,7 @@ def getCredentials(inputFile):
         return (user, password)
 
 def main():
-    print "Microworkers info script - by Liran Cohen V1.1"
+    print "Microworkers info script - by Liran Cohen V1.2"
 
     # Get credentials
     user, password = getCredentials(PASSWORDS_FILE)
@@ -61,7 +63,9 @@ def main():
     table = tree.find_class(MAIN_TABLE)
     campaigns = 0
     toReview = 0
+    money = 0
 
+    # get campaigns details
     for entry in table[0].find_class(ENTRIES):
         if (STATUS_LIVE in html.tostring(entry.find_class(STATUS_COLUMN)[0])) or (STATUS_ALMOST_COMPLETED in html.tostring(entry.find_class(STATUS_COLUMN)[0])):
             name = html.tostring(entry.find_class(CAMPAIGN_NAME)[0]).split("Year=\">",1)[1].split(":",1)[0]
@@ -73,10 +77,16 @@ def main():
                 toReview += int(not_rated)
             campaigns+=1
 
+    # get money
+    moneyTag = tree.find_class(MONEY_LEFT_TAG)[0]
+    money = html.tostring(moneyTag).split("<strong>")[2].split("</strong>")[0]
+
     #Logout
     browser.open(LOGOUT_URL, timeout=1.0)
 
-    print "Done. (Total campaigns: " + str(campaigns) + ", Total to review: " + str(toReview) + ")"
+    print "Total campaigns: " + str(campaigns) + ", Total to review: " + str(toReview)
+    print "Money left: " + money + "\n"
+    print "Done!"
 
 if __name__ == '__main__':
     main()
