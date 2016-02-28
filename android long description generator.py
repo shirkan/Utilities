@@ -54,7 +54,7 @@ def readDict(lang=""):
         sentences = []
         for line in inFile:
 
-            if a=="":
+            if line=="\n":
                 continue
 
             # Check for section begin
@@ -108,9 +108,14 @@ def joinDescription():
     global description, SECTIONS
 
     for section in SECTIONS[0:-1]:
-            for sentence in pickedDict[section]:
+        if section == "Features":
+            description += "<b><u>Exclusive Game Features:</u></b>\n"
+        for sentence in pickedDict[section]:
+            if section == "Features":
+                description += "★" + sentence + "\n"
+            else:
                 description += sentence + " "
-            description += "\n\n"
+        description += "\n"
 
 def replaceWords():
     global picks, description
