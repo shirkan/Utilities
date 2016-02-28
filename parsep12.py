@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description='Create parse app and retrieve info
 # account name
 parser.add_argument('-account', required=True, help='Account to upload file to')
 # p12 file
-parser.add_argument('-file', required=True, help='P12 file to upload')
+parser.add_argument('-file', default="", required=False, help='P12 file to upload')
 # app name
 parser.add_argument('-app', required=False, help='App to upload p12 to')
 
@@ -29,7 +29,7 @@ p12File = args.file
 selectedApp = args.app
 printOnly = False
 
-if not os.path.isfile(p12File):
+if p12File == "" or not os.path.isfile(p12File):
     print "No such file " + p12File + ", printing only"
     printOnly = True
 
@@ -61,9 +61,8 @@ def getApps(user, password):
     return apps
 
 def printApps(apps):
-    for app in appLists:
-        print "[" + str(i) + "] " + app
-        i+=1
+    for app in apps:
+        print app
 
 def selectApp(apps, selectedapp):
     if selectedapp!="":
@@ -119,15 +118,19 @@ def main():
     loginPass.send_keys(password)
     loginPass.send_keys(Keys.RETURN)
 
-    WebDriverWait(b, 15).until(EC.presence_of_element_located((By.ID, "appsData")))
+    WebDriverWait(b, 25).until(EC.presence_of_element_located((By.ID, "appsData")))
 
     # go to URL
     b.get(url)
-    WebDriverWait(b, 15).until(EC.presence_of_element_located((By.XPATH, "//input[@type='file']")))
+    WebDriverWait(b, 25).until(EC.presence_of_element_located((By.XPATH, "//input[@type='file']")))
     uploadButton = b.find_element_by_xpath("//input[@type='file']")
     uploadButton.send_keys(p12File)
 
-    print "Uploading p12... sleeping for 15 seconds"
+    print "Uploading p12... sleeping for 10 seconds..."
+    time.sleep(10)
+
+    print "Refreshing... please check file was uploaded. Sleeping for 15 seconds..."
+    b.refresh();
     time.sleep(15)
 
     print "Done! closing..."
