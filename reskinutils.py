@@ -39,10 +39,10 @@ def copyFilesByName(source, target):
 def copyFilesByGlob(source, target):
 	global itemsCopied, run
 	for file in glob.glob(source):
-	    reskinPrint("Copying globbed " + file + " to " + target)
-	    itemsCopied+=1
-	    if run:
-	    	shutil.copy(file, target)
+		reskinPrint("Copying globbed " + file + " to " + target)
+		itemsCopied+=1
+		if run:
+			shutil.copy(file, target)
 
 # Copy entire tree (folder)
 def copyTree(source, target):
