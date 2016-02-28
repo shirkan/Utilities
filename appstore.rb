@@ -40,6 +40,8 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Update app in account (fill in what's new in all languages)" => "updateApp",
     "Account status" => "accountStatus($currLogin[\"currAccount\"], $config[\"accounts\"][$currLogin[\"currAccount\"]])",
     "Display credentials" => "displayCredentials",
+    "Show available games to upload p12 to" => "showP12InParse",
+    "Upload p12 file to Parse" => "uploadP12ToParse",
     "Log out from account" => "logout",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
     "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
@@ -55,6 +57,7 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Upload screenshots" => "uploadScreenshots",
     "Update price tier" => "appUpdatePriceTier",
     "Update app categories" => "appUpdateCatergories",
+    "Update privacy URL" => "updatePrivacyURL",
     "----- BUILDS MENU -----" => MENUTITLE::APPS_TITLE,
     "Create a new build for compilation" => "createNewBuild",
     "Create flurry ID" => "createFlurryID",
@@ -66,6 +69,7 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
 }
 
 KEYWORDS_MENU_OPTIONS = { "Get current keywords" => "getKeywords",
+    "Save current keywords to file" => "saveKeywords",
     "Update generic keywords" => "updateGenericKeywords",
     "Update keywords from file" => "updateKeywordsFromFile"
 }
@@ -192,13 +196,15 @@ def execute(cmd)
 end
 
 # Read file or dir
-def readFile(msg, isDir = false)
+def readFile(msg, isDir = false, allowEmpty = false)
     path = ""
     loop do
         puts msg
         path = gets.chomp()
         return "0" if path == "0"
         path = path.sub("~", File.expand_path("~")).rstrip.gsub('\\',"")
+
+        return "" if (path == "" and allowEmpty)
 
         next if not File.exists?(path)
 
@@ -409,7 +415,22 @@ end
 # Get keywords
 def getKeywords()
     v = appIsEditable($currLogin["currApp"]) ? $currLogin["currApp"].edit_version : $currLogin["currApp"].live_version
-    puts v.keywords()
+    keywords = v.keywords()
+    keywords.keys.each {|lang| puts "#{lang}=#{keywords[lang]}"}
+end
+
+# Save keywords
+def saveKeywords()
+    v = appIsEditable($currLogin["currApp"]) ? $currLogin["currApp"].edit_version : $currLogin["currApp"].live_version
+    keywords = v.keywords()
+    filename = $currLogin["currAppName"] + ".keywords"
+    puts "Saving keywords to file: #{filename}"
+
+    f = File.open(filename, "w")
+    keywords.keys.each {|lang| f.puts("#{lang}=#{keywords[lang]}")}
+    f.close()
+
+    puts "Done!"
 end
 
 # Update keywords in app
@@ -462,6 +483,10 @@ def updateKeywordsFromFile()
     return if inputFile == "0"
 
     keywordsList = readDictFromFile(inputFile)
+    if not keywordsList.key?("keywords")
+        putsc "Couldn't find keywords section, please check file contains [\"keywords\"]"
+        return
+    end
     updateKeywords(keywordsList["keywords"])
 end
 
@@ -473,7 +498,7 @@ def getTitles()
     originalNames = names.original_array
     for i in 0..originalNames.length-1
         lang = originalNames[i]["localeCode"]
-        puts "#{lang.ljust(7)}: #{names[lang]}"
+        puts "#{lang}=#{names[lang]}"
     end
 end
 
@@ -533,7 +558,7 @@ end
 
 def updateTitlesFromFile()
     # Get file, select default if empty
-    inputFile = readFile("Enter file to read titles from (default: #{$config["defaults"]["titlesInputFile"]}) or 0 to get back:")
+    inputFile = readFile("Enter file to read titles from (default: #{$config["defaults"]["titlesInputFile"]}) or 0 to get back:", false, true)
     inputFile = $config["defaults"]["titlesInputFile"] if inputFile == ""
     return if inputFile == "0"
 
@@ -550,28 +575,31 @@ def createNewApp()
 
     while keepTrying do
         begin
-            puts "Enter app name:"
+            puts "Enter app name (or 0 to go back):"
             name = gets.chomp()
+            return if name=='0'
 
             bundleID = "com.#{$currLogin["currAccount"].split("@")[0]}.#{name.downcase.gsub(" ","")}"
             puts "Enter bundle id (default is #{bundleID}):"
             inputBundle = gets.chomp()
             inputBundle = bundleID if inputBundle == ""
 
-            sku = configData["sku"].concat("_#{$today.day}#{$today.month}#{$today.year}")
+            sku = configData["sku"].concat("_#{$today.day}-#{$today.month}-#{$today.year}").concat("_" + rand().to_s().split(".",2)[1][1..5.to_i])
             lang = configData["primaryLangauge"]
             version = configData["version"]
 
             # Create new app identifier in Developer Portal
             puts "Creating a new app with name #{name} and bundle id #{inputBundle}..."
-            app = Spaceship.app.create!(bundle_id: inputBundle, name: name)
+            portalApp = Spaceship.app.create!(bundle_id: inputBundle, name: name)
 
             # Create new app entry on ITC
             puts "Registering a new app on ITC with the following details:\nName: #{name}\nBundle ID: #{inputBundle}\nSKU: #{sku}\nPrimary language: #{lang}\nVersion: #{version}"
-            itcApp = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
-            setCurrentApp(app, name, inputBundle, type)
+            app = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
+            setCurrentApp(Spaceship::Tunes::Application.find(inputBundle), name, inputBundle, type)
+            # setCurrentApp(app, name, inputBundle, type)
 
             puts "App created succesfully on ITC and Developers Portal, no errors should occur now..."
+            keepTrying = false
 
             # Only slots - need to upload CSR and create push norifications, download provisioning file
             createPushNotification() if type == TYPES::SLOTS
@@ -582,6 +610,9 @@ def createNewApp()
 
             # Set categories
             appUpdateCatergories($currLogin["currApp"], configData)
+
+            # Set Privacy URL
+            updatePrivacyURL()
 
             # Upload icon
             uploadIcon()
@@ -596,13 +627,12 @@ def createNewApp()
             updateNewAppVersion()
 
             # Update descriptions and keywords
-            updateDefaultDescriptionAndKeywords()
+            # updateDefaultDescriptionAndKeywords()
 
             # Create IAP template
             createIAPTemplate()
 
-            # Process completed
-            keepTrying = false
+
         rescue => e
             putsc "Caught exception: #{e}\n\nPlease fix and retry.", "e"
             setCurrentApp(NONE, NONE, NONE, NONE)
@@ -620,6 +650,7 @@ def updateApp()
     end
 
     type = $currLogin["currAppType"]
+    config = $config["new#{type}"]
 
     # we need to create a new version
     if currStatus == APPSTATUS::LIVE
@@ -657,8 +688,19 @@ def updateApp()
     end
 
     # save
-    puts "Saving app info on ITC..."
-    v.save!
+    while true
+        begin
+            puts "Saving app info on ITC..."
+            v.save!
+            break
+        rescue Spaceship::TunesClient::ITunesConnectError => e
+            puts "Caught error: #{e}\nChanging phone number..."
+            v.review_phone_number = config["reviewPhonePrefix"] + rand().to_s().split(".",2)[1][1..config["reviewPhoneDigits"].to_i]
+            puts "Trying to use phone number #{v.review_phone_number}..."
+        end
+        break
+    end
+
     puts "Done."
 end
 
@@ -710,20 +752,40 @@ def updateDefaultDescriptionAndKeywords()
     v = app.edit_version
 
     # Open langauges in new ver and place descriptions & keywords
-    puts "Creating localizations..."
-    v.create_languages(config["localizations"])
-    v.save!
+    while true
+        begin
+            puts "Creating localizations..."
+            v.create_languages(config["localizations"])
+            puts "Saving..."
+            v.save!
+            break
+        rescue Spaceship::TunesClient::ITunesConnectError, Spaceship::Client::UnexpectedResponse => e
+            if e == Spaceship::Client::UnexpectedResponse or "#{e}" == "Unauthorized access"
+                putsc "Caught Unauthorized Access - please try to login again.", "e"
+                return
+            else
+                putsc "Caught error: #{e},\nChanging phone number and retrying...", "e"
+                v.review_phone_number = config["reviewPhonePrefix"] + rand().to_s().split(".",2)[1][1..config["reviewPhoneDigits"].to_i]
+                puts "Trying to use phone number #{v.review_phone_number}..."
+            end
+        end
+    end
 
+    v = app.edit_version
     puts "Placing default description & keywords..."
     config["localizations"].each do |lang|
         v.description[lang] = config["description"].gsub("\\n","\n")
-        puts "for lang #{lang}     placing #{$config["generic#{type}Keywords"][lang]}"
+        # puts "for lang #{lang}     placing #{$config["generic#{type}Keywords"][lang]}"
         v.keywords[lang] = $config["generic#{type}Keywords"][lang]
     end
 
-    puts "Saving details..."
-    v.save!
-    puts "Done saving details on ITC."
+    begin
+        puts "Saving details..."
+        v.save!
+        puts "Done saving details on ITC."
+    rescue Spaceship::TunesClient::ITunesConnectError
+        putsc "Caught error, please check and retry if needed...", "e"
+    end
 end
 
 #Create IAP template page
@@ -776,10 +838,14 @@ def uploadIcon()
     return if path == "0"
 
     puts "Uploading icon from #{path}..."
-    v = $currLogin["currApp"].edit_version
-    v.upload_large_icon!(path)
-    puts "Saving app info on ITC... "
-    v.save!
+    begin
+        v = $currLogin["currApp"].edit_version
+        v.upload_large_icon!(path)
+        puts "Saving app info on ITC... "
+        v.save!
+    rescue Spaceship::Client::UnexpectedResponse => e
+        putsc "Caught error: #{e}", "e"
+    end
 end
 
 def uploadScreenshots()
@@ -850,8 +916,8 @@ def uploadScreenshots()
             i+=1
         end
         puts "[#{i.to_s.rjust(2)}] - Back\nEnter langs separated by commas:"
-        options = gets().chomp
-        return if options == i-1
+        options = readNumber(0,i)
+        return if options == i
 
         puts "Uploading screenshots to localizations: #{options.split(",").map {|l| langs[l.to_i]}}"
         options.split(",").each do |index|
@@ -906,7 +972,7 @@ def createNewDentistBuild()
     return if iap == "0"
     iap = $currLogin["currBundleID"] if iap == ""
 
-    #universe ID & Flurry
+    #universe ID
     universe = ""
     flurry = ""
     while universe == "" do
@@ -915,6 +981,7 @@ def createNewDentistBuild()
             universe = gets().chomp()
             return if universe == "0"
             universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
+            universe = "" if universe.downcase == "n"
         else
             puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
             universe = gets().chomp()
@@ -925,7 +992,7 @@ def createNewDentistBuild()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe
+        $currIDs["universe"] = universe if universe != ""
     end
 
     while flurry == "" do
@@ -934,6 +1001,7 @@ def createNewDentistBuild()
             flurry = gets().chomp()
             return if flurry == "0"
             flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+            flurry = "" if flurry.downcase == "n"
         else
             puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
             flurry = gets().chomp()
@@ -943,7 +1011,7 @@ def createNewDentistBuild()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry
+        $currIDs["flurry"] = flurry if flurry != ""
     end
 
     #Ver
@@ -1001,7 +1069,7 @@ def createNewSlotsBuildReskinIOS()
     return if leaderboard == "0"
     leaderboard = $currLogin["currBundleID"] + ".leaderboard" if leaderboard == ""
 
-    #universe ID & Flurry
+    #universe ID
     universe = ""
     flurry = ""
     while universe == "" do
@@ -1010,6 +1078,7 @@ def createNewSlotsBuildReskinIOS()
             universe = gets().chomp()
             return if universe == "0"
             universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
+            universe = "" if universe.downcase == "n"
         else
             puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
             universe = gets().chomp()
@@ -1020,7 +1089,7 @@ def createNewSlotsBuildReskinIOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe
+        $currIDs["universe"] = universe if universe != ""
     end
 
     while flurry == "" do
@@ -1029,6 +1098,7 @@ def createNewSlotsBuildReskinIOS()
             flurry = gets().chomp()
             return if flurry == "0"
             flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+            flurry = "" if flurry.downcase == "n"
         else
             puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
             flurry = gets().chomp()
@@ -1038,7 +1108,7 @@ def createNewSlotsBuildReskinIOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry
+        $currIDs["flurry"] = flurry if flurry != ""
     end
 
     #parse ID
@@ -1050,18 +1120,18 @@ def createNewSlotsBuildReskinIOS()
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
-            parseAppId = NONE if parseAppId.downcase == "n"
+            parseAppId = "" if parseAppId.downcase == "n"
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             if parseAppId == ""
                 createParse()
-                parseAppID = $currIDs["parseAppID"]
+                parseAppId = $currIDs["parseAppID"]
                 parseClientKey = $currIDs["parseClientKey"]
             end
         end
-        $currIDs["parseAppID"] = parseAppId
+        $currIDs["parseAppID"] = parseAppId if parseAppId != ""
     end
 
     while parseClientKey == "" do
@@ -1070,19 +1140,19 @@ def createNewSlotsBuildReskinIOS()
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
             parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
-            parseClientKey = NONE if parseClientKey.downcase == "n"
+            parseClientKey = "" if parseClientKey.downcase == "n"
         else
             puts "Enter Parse Client Key, enter 0 to return:"
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
         end
-        $currIDs["parseClientKey"] = parseClientKey
+        $currIDs["parseClientKey"] = parseClientKey if parseClientKey != ""
     end
 
     #Coins
     puts "Enter coins (500-1000000, default is 5000 or enter 0 to return):"
     coins = readNumber(0,1000000, true)
-    return if coins == "0"
+    return if coins == 0
     coins = 5000 if coins == ""
     coins = 500 if coins <= 500
 
@@ -1147,6 +1217,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             universe = gets().chomp()
             return if universe == "0"
             universe = $currIDs["universe"] if universe.downcase == 'y' or universe == ""
+            universe = "" if universe.downcase == "n"
         else
             puts "Enter universe ID or just press enter to call universe script. enter 0 to return:"
             universe = gets().chomp()
@@ -1157,7 +1228,7 @@ def createNewSlotsBuildReskinGFX2IOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe
+        $currIDs["universe"] = universe if universe != ""
     end
 
     while flurry == "" do
@@ -1166,6 +1237,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             flurry = gets().chomp()
             return if flurry == "0"
             flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+            flurry = "" if flurry.downcase == "n"
         else
             puts "Enter Flurry ID or just press enter to call flurry script. enter 0 to return:"
             flurry = gets().chomp()
@@ -1175,7 +1247,7 @@ def createNewSlotsBuildReskinGFX2IOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry
+        $currIDs["flurry"] = flurry if flurry != ""
     end
 
     #parse ID
@@ -1187,17 +1259,18 @@ def createNewSlotsBuildReskinGFX2IOS()
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
-            parseAppId = NONE if parseAppId.downcase == "n"
+            parseAppId = "" if parseAppId.downcase == "n"
         else
             puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
             parseAppId = gets().chomp()
             return if parseAppId == "0"
             if parseAppId == ""
                 createParse()
+                parseAppId = $currIDs["parseAppID"]
                 parseClientKey = $currIDs["parseClientKey"]
             end
         end
-        $currIDs["parseAppID"] = parseAppId
+        $currIDs["parseAppID"] = parseAppId if parseAppId != ""
     end
 
     while parseClientKey == "" do
@@ -1206,19 +1279,19 @@ def createNewSlotsBuildReskinGFX2IOS()
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
             parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
-            parseClientKey = NONE if parseClientKey.downcase == "n"
+            parseClientKey = "" if parseClientKey.downcase == "n"
         else
             puts "Enter Parse Client Key, enter 0 to return:"
             parseClientKey = gets().chomp()
             return if parseClientKey == "0"
         end
-        $currIDs["parseClientKey"] = parseClientKey
+        $currIDs["parseClientKey"] = parseClientKey if parseClientKey != ""
     end
 
     #Coins
     puts "Enter coins (500-1000000, default is 5000 or enter 0 to return):"
     coins = readNumber(0,1000000, true)
-    return if coins == "0"
+    return if coins == 0
     coins = 5000 if coins == ""
     coins = 500 if coins <= 500
 
@@ -1339,8 +1412,39 @@ def selectLatestBuild()
     end
 end
 
+def showP12InParse()
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["parsep12"] + " -account #{$currLogin["currAccount"]}")
+end
+
+def uploadP12ToParse()
+    inputFile = readFile("Enter p12 file or 0 to get back:")
+    inputFile = $config["defaults"]["keywordsInputFile"] if inputFile == ""
+    return if inputFile == "0"
+    puts "Enter game name (use \"Show apps in parse account\" to get numbers...):"
+    name = gets().chomp()
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["parsep12"] + " -file '#{inputFile}' -account #{$currLogin["currAccount"]} -app '#{name}'")
+end
+
 def submitForReview()
     puts "Not yet implemented..."
+end
+
+def updatePrivacyURL()
+    details = $currLogin["currApp"].details
+    privacyLangs = details.privacy_url
+    config = $config["new#{$currLogin["currAppType"]}"]
+
+    #workaround for now
+    puts "Setting privacy URLs in all languages..."
+    originalNames = privacyLangs.original_array
+    for i in 0..originalNames.length-1
+        lang = originalNames[i]["localeCode"]
+        privacyLang = privacyLangs.get_lang(lang)
+        privacyLang["privacyPolicyUrl"]["value"] = config["privacyURL"]
+    end
+
+    puts "Saving app info..."
+    details.save!
 end
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1353,7 +1457,7 @@ def appIsEditable(app)
         return (not app.edit_version.nil?)
     rescue Spaceship::Client::UnexpectedResponse
         putsc "Connection lost...", "e"
-        setCurrentApp(NONE, NONE, NONE, NONE)
+        logout()
     end
 end
 
@@ -1362,7 +1466,7 @@ def appStatus(app)
         return (appIsEditable(app) ? ((not app.live_version.nil?) ? APPSTATUS::LIVE_EDITABLE : APPSTATUS::EDITABLE ) : ((not app.live_version.nil?) ? APPSTATUS::LIVE : APPSTATUS::NOT_EXIST ))
     rescue Spaceship::Client::UnexpectedResponse
         putsc "Connection lost...", "e"
-        setCurrentApp(NONE, NONE, NONE, NONE)
+        logout()
     end
 end
 
@@ -1501,7 +1605,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.13 - By Liran Cohen"
+puts "Appstore Control Center V1.15 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
