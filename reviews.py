@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 from __future__ import print_function
-import requests, mechanize, cookielib, sys
+import requests, mechanize, cookielib, sys, os
 from lxml import html
 from time import sleep
 
@@ -10,7 +10,7 @@ SMOOTHREVIEW_SITE_URL = "http://smoothreviews.com/?history"
 SMOOTHREVIEW_LOGOUT_URL = "http://smoothreviews.com/?logout"
 SMOOTHREVIEW_LOGIN_USER_ELEMENT = "email"
 SMOOTHREVIEW_LOGIN_PASSWORD_ELEMENT = "password"
-SMOOTHREVIEW_PASSWORDS_FILE = "smoothreviews.passwords"
+SMOOTHREVIEW_PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/smoothreviews.passwords"
 
 # Install4Install details
 INSTALL4INSTALL_LOGIN_URL = "http://install4install.com/index.php"
@@ -18,7 +18,7 @@ INSTALL4INSTALL_SITE_URL = "http://install4install.com/userpanel.php"
 INSTALL4INSTALL_LOGOUT_URL = "http://install4install.com/logout.php"
 INSTALL4INSTALL_LOGIN_USER_ELEMENT = "username"
 INSTALL4INSTALL_LOGIN_PASSWORD_ELEMENT = "password"
-INSTALL4INSTALL_PASSWORDS_FILE = "install4install.passwords"
+INSTALL4INSTALL_PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/install4install.passwords"
 
 def dot():
     sys.stdout.write(".")
