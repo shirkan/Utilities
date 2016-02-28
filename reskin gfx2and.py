@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
 	# replace worlds
 	print("Replacing worlds assets...")
-	reskinutils.copyFilesByGlob(assets + "/LevelSelect/game*@2x.png", trgAssets)
+	reskinutils.copyFilesByGlob(assets + "/LevelSelect/game*@2x.*", trgAssets)
 	reskinutils.checkCopy(2*4 + 2)
 	print("Done.")
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
 				fileToCopy = assets + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j].title() + "@2x.png"
 				if not (os.path.isfile(fileToCopy)):
 					sys.exit("Cannot find " + assets + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j] + "@2x.png or " + fileToCopy)
-			
+
 			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "item_" + assetsDict[j].title() + "@2x.png")
 			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "/" + assetsDict[j].title() + "_" + reelsDict[i] +".png")
 	reskinutils.checkCopy(len(reelsDict) * len(assetsDict) * 2)
@@ -117,7 +117,7 @@ if __name__ == '__main__':
 	print("Replacing BASE KEY...")
 	reskinutils.replaceInFile(bigCasinoSlotsActivityFile, "enter_base_key_here", basekey)
 	print("Done.")
-	
+
 	# replace initial coins
 	print("Replacing initial coins to " + str(coins) + "...")
 	reskinutils.replaceInFile(mainMenuLayerFile, "enter_initial_coins_here", str(coins))
