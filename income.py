@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import requests, httplib, cookielib, sys, os, re, time, argparse
+import requests, httplib, cookielib, sys, os, re, time, argparse, calendar
 from lxml import html
 from datetime import date, timedelta
 import pycurl, json
@@ -27,8 +27,15 @@ SLEEP_TIME = 30
 # Parse inputs
 parser = argparse.ArgumentParser(description='Income script')
 # include IAP?
-parser.add_argument('-iap', default=0, required=False, help='Include IAP?')
+parser.add_argument('-iap', default=0, required=False, help='Include IAP? [0/1]')
+# specific month?
+parser.add_argument('-month', default="", required=False, help='Specific month? for example: 2016-02')
 includeIAP = (parser.parse_args().iap == "1")
+
+inputMonth = parser.parse_args().month
+month = (inputMonth if (inputMonth != "") else date.today().strftime('%Y-%m'))
+firstDayOfMonth = month + "-01"
+lastDayOfMonth = (month + "-" + str(calendar.monthrange(int(month.split("-")[0]), int(month.split("-")[1].lstrip("0")))[1]) if (inputMonth != "") else time.strftime("%Y-%m-%d"))
 
 def getCredentials(inputFile):
     accounts = {}
@@ -42,7 +49,7 @@ def pageBreak():
     print "===================================="
 
 def main():
-    print "Income info script - by Liran Cohen V1.3"
+    print "Income info script - by Liran Cohen V1.4"
 
     # Get credentials
     accounts = getCredentials(PASSWORDS_FILE)
@@ -50,7 +57,7 @@ def main():
     #Casinoland info
     print "Checking Casinoland...\n"
     user, password = accounts[KEYS[0]]
-    month = time.strftime("%Y-%m")
+    # month = time.strftime("%Y-%m")
     connection = httplib.HTTPSConnection(CASINOLAND_LOGIN_URL, 443)
     connection.connect()
     url = '/partners/feeds/custom_36.php?id=' + user + '&type=month_summary&month=' + month
@@ -67,7 +74,7 @@ def main():
     session_requests = requests.session()
     for i in range(1,3):
         user, password = accounts[KEYS[i]]
-        url = "https://www.buffalopartners.com/api/revshare/traffic?username=" + user + "&apikey=" + password + "&start=" + time.strftime("%Y-%m-01") + "&end=" + time.strftime("%Y-%m-%d")
+        url = "https://www.buffalopartners.com/api/revshare/traffic?username=" + user + "&apikey=" + password + "&start=" + firstDayOfMonth + "&end=" + lastDayOfMonth
 
         result = session_requests.get(url)
         if not result.ok:
@@ -81,7 +88,7 @@ def main():
                 visits += int(child.attrib['visits'])
                 newOpens += int(child.attrib['newOpens'])
                 actives += int(child.attrib['actives'])
-        print KEYS[i].replace("_", " ") + ": "
+        print KEYS[i].replace("_", " ") + "for " + month + ": "
         print "Revenue: " + root[1][-1].text + "$"
         print "Visits: " + str(visits)
         print "New opens: " + str(newOpens)
@@ -172,9 +179,9 @@ def main():
     print "\nTotal: " + str(total) + "$"
     pageBreak()
 
-    beginningOfMonth = date.today().strftime('%Y-%m-01')
-    print "Getting Appannie data from the beginning of the month (" + beginningOfMonth + " - " + today + ")..."
-    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + beginningOfMonth + "&end_date=" + today)
+    # beginningOfMonth = date.today().strftime('%Y-%m-01')
+    print "Getting Appannie data from the beginning of the month (" + firstDayOfMonth + " - " + lastDayOfMonth + ")..."
+    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + firstDayOfMonth + "&end_date=" + lastDayOfMonth)
     curl.setopt(pycurl.HTTPHEADER, ['Authorization: Bearer ' + user])
     b.truncate(0)
     curl.perform()
@@ -184,7 +191,7 @@ def main():
     totalIAP = 0
     for i in APPANNIE_ACCOUNTS:
         b.truncate(0)
-        curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + beginningOfMonth + "&end_date=" + today)
+        curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + firstDayOfMonth + "&end_date=" + lastDayOfMonth)
         curl.perform()
         iapj = json.loads(b.getvalue())
         if iapj['sales_list']:
