@@ -7,3 +7,8 @@ google*.py*
 google/*
 tmp*
 control_table.txt
+IAP*.png
+IAP*.jpg
+MW_API.*
+aso ranking.ini
+aso ranking.csv
