@@ -15,6 +15,7 @@ IOS_SLOT_TYPE = "141"
 ANDROID_SLOT_TYPE = "623"
 DENTIST_TYPE = "145"
 CODE_CLASS = "projectKey"
+CODE_FIELD = 0
 
 # Parse inputs
 parser = argparse.ArgumentParser(description='Create parse app and retrieve info')
@@ -31,12 +32,12 @@ name = args.name
 type = args.type
 
 def getCredentials(inputFile):
-        with open(inputFile) as inFile:
-            for line in inFile:
-                user, password = line.split()
-        return (user, password)
+    with open(inputFile) as inFile:
+        for line in inFile:
+            user, password = line.split()
+    return (user, password)
 
-print "Flurry create new app script - by Liran Cohen V1.0"
+print "Flurry create new app script - by Liran Cohen V1.1"
 
 # Get credentials
 user, password = getCredentials(PASSWORDS_FILE)
@@ -85,7 +86,7 @@ print "Parsing ID..."
 tree = html.fromstring(res.get_data())
 code = tree.find_class(CODE_CLASS)
 
-flurryID = html.tostring(code[0]).split("projectKey\">",1)[1].split("</",1)[0]
+flurryID = html.tostring(code[CODE_FIELD]).split(CODE_CLASS + '\">',1)[1].split("</",1)[0]
 
 print flurryID
 
