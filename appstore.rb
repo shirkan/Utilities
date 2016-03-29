@@ -40,8 +40,8 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Update app in account (fill in what's new in all languages)" => "updateApp",
     "Account status" => "accountStatus($currLogin[\"currAccount\"], $config[\"accounts\"][$currLogin[\"currAccount\"]])",
     "Display credentials" => "displayCredentials",
-    "Show available games to upload p12 to" => "showP12InParse",
-    "Upload p12 file to Parse" => "uploadP12ToParse",
+    "Show available games to upload p12 to (DEPRECATED)" => "showP12InParse",
+    "Upload p12 file to Parse (DEPRECATED)" => "uploadP12ToParse",
     "Log out from account" => "logout",
     "----- APPS MENU -----" => MENUTITLE::APPS_TITLE,
     "Set first version details (Use this to fix *NEW* apps only!)" => "updateNewAppVersion",
@@ -62,7 +62,8 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Create a new build for compilation" => "createNewBuild",
     "Create flurry ID" => "createFlurryID",
     "Create universe server ID" => "createUniverseID",
-    "Create Parse app ID & client key" => "createParse",
+    "Create Batch ID" => "createBatchID",
+    "Create Parse app ID & client key (DEPRECATED)" => "createParse",
     "Select latest build" => "selectLatestBuild",
     "Submit for review" => "submitForReview",
     "Exit" => "exit"
@@ -156,6 +157,8 @@ def putsc (msg, type = "i")
             "\e[35m#{msg}\e[0m"
         when "red"
             "\e[31m#{msg}\e[0m"
+        when "yellow"
+            "\e[33m#{msg}\e[0m"
         else
             msg
     end
@@ -992,7 +995,7 @@ def createNewDentistBuild()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe if universe != ""
+        $currIDs["universe"] = universe
     end
 
     while flurry == "" do
@@ -1011,7 +1014,7 @@ def createNewDentistBuild()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry if flurry != ""
+        $currIDs["flurry"] = flurry
     end
 
     #Ver
@@ -1089,7 +1092,7 @@ def createNewSlotsBuildReskinIOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe if universe != ""
+        $currIDs["universe"] = universe
     end
 
     while flurry == "" do
@@ -1108,45 +1111,28 @@ def createNewSlotsBuildReskinIOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry if flurry != ""
+        $currIDs["flurry"] = flurry
     end
 
-    #parse ID
-    parseAppId = ""
-    parseClientKey = ""
-    while parseAppId == "" do
-        if $currIDs["parseAppID"] != NONE
-            puts "Do you want to use this Parse App ID #{$currIDs["parseAppID"]} ([y]/n, 0 to return)?"
-            parseAppId = gets().chomp()
-            return if parseAppId == "0"
-            parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
-            parseAppId = "" if parseAppId.downcase == "n"
+    #Batch ID
+    batchID = ""
+    while batchID == "" do
+        if $currIDs["batch"] != NONE
+            puts "Do you want to use this Batch ID #{$currIDs["batch"]} ([y]/n, 0 to return)?"
+            batchID = gets().chomp()
+            return if batchID == "0"
+            batchID = $currIDs["batch"] if batchID.downcase == 'y' or batchID == ""
+            batchID = "" if batchID.downcase == "n"
         else
-            puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
-            parseAppId = gets().chomp()
-            return if parseAppId == "0"
-            if parseAppId == ""
-                createParse()
-                parseAppId = $currIDs["parseAppID"]
-                parseClientKey = $currIDs["parseClientKey"]
+            puts "Enter Batch ID or just press enter to call parse script. enter 0 to return:"
+            batchID = gets().chomp()
+            return if batchID == "0"
+            if batchID == ""
+                createBatchID()
+                batchID = $currIDs["batch"]
             end
         end
-        $currIDs["parseAppID"] = parseAppId if parseAppId != ""
-    end
-
-    while parseClientKey == "" do
-        if $currIDs["parseClientKey"] != NONE
-            puts "Do you want to use this Parse Client Key #{$currIDs["parseClientKey"]} ([y]/n, 0 to return)?"
-            parseClientKey = gets().chomp()
-            return if parseClientKey == "0"
-            parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
-            parseClientKey = "" if parseClientKey.downcase == "n"
-        else
-            puts "Enter Parse Client Key, enter 0 to return:"
-            parseClientKey = gets().chomp()
-            return if parseClientKey == "0"
-        end
-        $currIDs["parseClientKey"] = parseClientKey if parseClientKey != ""
+        $currIDs["batch"] = batchID
     end
 
     #Coins
@@ -1162,12 +1148,12 @@ def createNewSlotsBuildReskinIOS()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
+    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nBatch ID:#{batchID}\nCoins:#{coins}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewSlotsBuildReskinIOS() if option.downcase == "n"
 
-    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin ios"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin ios"] + " -name '#{name}' -source '#{source}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -batch #{batchID} -coins #{coins} -ver #{ver} -run 1")
 end
 
 def createNewSlotsBuildReskinGFX2IOS()
@@ -1250,42 +1236,25 @@ def createNewSlotsBuildReskinGFX2IOS()
         $currIDs["flurry"] = flurry if flurry != ""
     end
 
-    #parse ID
-    parseAppId = ""
-    parseClientKey = ""
-    while parseAppId == "" do
-        if $currIDs["parseAppID"] != NONE
-            puts "Do you want to use this Parse App ID #{$currIDs["parseAppID"]} ([y]/n, 0 to return)?"
-            parseAppId = gets().chomp()
-            return if parseAppId == "0"
-            parseAppId = $currIDs["parseAppID"] if parseAppId.downcase == 'y' or parseAppId == ""
-            parseAppId = "" if parseAppId.downcase == "n"
+    #Batch ID
+    batchID = ""
+    while batchID == "" do
+        if $currIDs["batch"] != NONE
+            puts "Do you want to use this Batch ID #{$currIDs["batch"]} ([y]/n, 0 to return)?"
+            batchID = gets().chomp()
+            return if batchID == "0"
+            batchID = $currIDs["batch"] if batchID.downcase == 'y' or batchID == ""
+            batchID = "" if batchID.downcase == "n"
         else
-            puts "Enter Parse App ID or just press enter to call parse script. enter 0 to return:"
-            parseAppId = gets().chomp()
-            return if parseAppId == "0"
-            if parseAppId == ""
-                createParse()
-                parseAppId = $currIDs["parseAppID"]
-                parseClientKey = $currIDs["parseClientKey"]
+            puts "Enter Batch ID or just press enter to call parse script. enter 0 to return:"
+            batchID = gets().chomp()
+            return if batchID == "0"
+            if batchID == ""
+                createBatchID()
+                batchID = $currIDs["batch"]
             end
         end
-        $currIDs["parseAppID"] = parseAppId if parseAppId != ""
-    end
-
-    while parseClientKey == "" do
-        if $currIDs["parseClientKey"] != NONE
-            puts "Do you want to use this Parse Client Key #{$currIDs["parseClientKey"]} ([y]/n, 0 to return)?"
-            parseClientKey = gets().chomp()
-            return if parseClientKey == "0"
-            parseClientKey = $currIDs["parseClientKey"] if parseClientKey.downcase == 'y' or parseClientKey == ""
-            parseClientKey = "" if parseClientKey.downcase == "n"
-        else
-            puts "Enter Parse Client Key, enter 0 to return:"
-            parseClientKey = gets().chomp()
-            return if parseClientKey == "0"
-        end
-        $currIDs["parseClientKey"] = parseClientKey if parseClientKey != ""
+        $currIDs["batch"] = batchID if batchID != ""
     end
 
     #Coins
@@ -1301,12 +1270,12 @@ def createNewSlotsBuildReskinGFX2IOS()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nAssets:#{assets}\nIcons:#{icons}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nParse App ID:#{parseAppId}\nParse Client Key:#{parseClientKey}\nCoins:#{coins}\nVersion:#{ver}"
+    puts "Name: #{name}\nAssets:#{assets}\nIcons:#{icons}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nBatch ID:#{batchID}\nCoins:#{coins}\nVersion:#{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewSlotsBuildReskinIOS() if option.downcase == "n"
 
-    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin gfx2ios"] + " -name '#{name}' -assets '#{assets}' -icons '#{icons}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -parseid #{parseAppId} -parseck #{parseClientKey} -coins #{coins} -ver #{ver} -run 1")
+    execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["reskin gfx2ios"] + " -name '#{name}' -assets '#{assets}' -icons '#{icons}' -target '#{target}' -bundle #{bundleID} -iap #{iap} -leaderboard #{leaderboard} -id #{universe} -flurry #{flurry} -batch #{batchID} -coins #{coins} -ver #{ver} -run 1")
 end
 
 def createPushNotification()
@@ -1348,6 +1317,7 @@ def createFlurryID()
 end
 
 def createUniverseID()
+    config = $config["new#{$currLogin["currAppType"]}"]
     puts "Enter game name (press enter to use \"#{$currLogin["currAppName"]}\" or enter 0 to return):"
     name = gets().chomp()
     return if name == "0"
@@ -1361,6 +1331,7 @@ def createUniverseID()
             flurry = gets().chomp()
             return if flurry == "0"
             flurry = $currIDs["flurry"] if flurry.downcase == 'y' or flurry == ""
+            flurry = "" if flurry.downcase == 'n'
         else
             puts "Enter flurry ID or just press enter to call flurry script. enter 0 to return:"
             flurry = gets().chomp()
@@ -1370,14 +1341,49 @@ def createUniverseID()
                 flurry = $currIDs["flurry"]
             end
         end
+        $currIDs["flurry"] = flurry
     end
-    $currIDs["flurry"] = flurry
 
-    template = ($currLogin["currAppType"] == TYPES::DENTIST ? 'dentist' : 'slots v3')
+    if config["templates"].length > 1
+
+        templates = config["templates"].clone.push("Back")
+        for i in 0..templates.length-1
+            putsc "[#{i}] - #{templates[i]}"
+        end
+
+        puts "Select option:"
+        option = readNumber(0, templates.length-1)
+        if option == templates.length-1
+            return
+        end
+
+        template = templates[option]
+    else
+        template = config["templates"][0]
+    end
+
+    putsc "executing:    #{$config["externalUtilities"]["dir"]} + #{$config["externalUtilities"]["universe"]} + -name '#{name}' -flurry #{flurry} -template '#{template}'"
+    return
 
     returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["universe"] + " -name '#{name}' -flurry #{flurry} -template '#{template}'")
     $currIDs["universe"] = returnValue.split("acc respond:")[1]
     puts "Universe ID: #{$currIDs["universe"]}"
+end
+
+def createBatchID()
+    puts "Enter game name (press enter to use \"#{$currLogin["currAppName"]}\" or enter 0 to return):"
+    name = gets().chomp()
+    return if name == "0"
+    name = $currLogin["currAppName"] if name == ""
+    $currLogin["currAppName"] = name
+
+    puts "Enter p12 to upload (press 0 to return):"
+    p12 = gets().chomp()
+    return if p12 == "0"
+
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["batch"] + " -name '#{name}' -p12 #{p12} -oldFirefox")
+    $currIDs["batch"] = returnValue.split("acc respond:")[1]
+    puts "Batch ID: #{$currIDs["batch"]}"
 end
 
 def createParse()
@@ -1525,6 +1531,11 @@ def showMenu(dict, backOption=true)
     j=0
     color = "regular"
     for i in 0..length
+        if dict.keys[i].include?("(DEPRECATED)")
+            putsc "[#{j.to_s.rjust(2)}] - #{dict.keys[i]}", "red"
+            j+=1
+            next
+        end
         case dict[dict.keys[i]]
         when MENUTITLE::GENERAL_TITLE
             putsc "#{dict.keys[i]}", "bold"
@@ -1533,19 +1544,17 @@ def showMenu(dict, backOption=true)
         when MENUTITLE::ACCOUNT_TITLE
             color = $currLogin["currAccount"] == NONE ? "red" : "bold"
             putsc "#{dict.keys[i]}", color
-            color = "regular" if color == "bold"
             funcs.delete(dict.keys[i])
 
         when MENUTITLE::APPS_TITLE
             color = $currLogin["currApp"] == NONE ? "red" : "bold"
             putsc "#{dict.keys[i]}", color
-            color = "regular" if color == "bold"
             funcs.delete(dict.keys[i])
-
         else
             putsc "[#{j.to_s.rjust(2)}] - #{dict.keys[i]}", color
             j+=1
         end
+        color = "regular" if color == "bold"
     end
 
     if backOption
@@ -1605,7 +1614,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.15 - By Liran Cohen"
+puts "Appstore Control Center V1.17 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
