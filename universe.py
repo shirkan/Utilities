@@ -13,7 +13,8 @@ TEMPLATE = "template"
 TEMPLATE_TYPE = {
     'slots v3' : "56318a888c0a5abb348b4567",
     'slots v3 android' : "56318ad78c0a5ae5348b4567",
-    'dentist' : "54902dc339e97a91568b4567"
+    'dentist' : "54902dc339e97a91568b4567",
+    'slots v3 se' : "568982bc8c0a5a37468b4567"
 }
 APPS_PAGE = "http://universe.appninjaz.com/applications"
 
@@ -28,7 +29,7 @@ parser = argparse.ArgumentParser(description='Create parse app and retrieve info
 # game name
 parser.add_argument('-name', required=True, help='Game name')
 # template name
-parser.add_argument('-template', required=True, choices = ['slots v3', 'slots v3 android', 'dentist'], help='which template to open the game in')
+parser.add_argument('-template', required=True, choices = TEMPLATE_TYPE.keys(), help='which template to open the game in')
 # flurry id
 parser.add_argument('-flurry', required=True, help='Flurry ID')
 
@@ -43,7 +44,7 @@ def getCredentials(inputFile):
             user, password = line.split()
     return (user, password)
 
-print "Universe create new app script - by Liran Cohen V1.0"
+print "Universe create new app script - by Liran Cohen V1.2"
 
 # Get credentials
 user, password = getCredentials(PASSWORDS_FILE)
@@ -81,11 +82,19 @@ print "Parsing ID..."
 res = browser.open(APPS_PAGE, timeout=15.0)
 tree = html.fromstring(res.get_data())
 table = tree.find_class('table')
-last_row = html.tostring(table[0].getchildren()[1].getchildren()[-1])
-if not name in last_row:
-    print "Couldn't find created game with name " + name + " in the last row... that's bizarre :("
+# search for game
+rows = table[0].getchildren()[1].getchildren()
+found = False
+for row in rows:
+    gameID = html.tostring(row.getchildren()[0]).replace("<td>","").replace("</td>","").replace("\t","").replace("\n","")
+    gameName = html.tostring(row.getchildren()[1]).replace("<td>","").replace("</td>","").replace("\t","").replace("\n","")
+    gameType = html.tostring(row.getchildren()[2]).replace("<td>","").replace("</td>","").replace("\t","").replace("\n","")
+    if (gameName == name) and (gameType == type):
+        found = True
+        break
+if not found:
+    print "Couldn't find created game with name " + name + " in the last row... that's bizarre :( Please check."
     sys.exit()
-gameID = last_row.split("delete_",1)[1].split("\"",1)[0]
 print "Server ID for game is: " + gameID
 
 # update flurry ID
