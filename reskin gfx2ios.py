@@ -2,7 +2,7 @@
 import argparse, sys, reskinutils, glob
 from reskinutils import reskinPrint
 
-print("Graphics 2 iOS slots reskinner v1.1")
+print("Graphics 2 iOS slots reskinner v1.2")
 
 defaultCoins = 5000
 defaultVer = "1.0"
@@ -26,9 +26,11 @@ parser.add_argument('-iap', required=True, help='IAP ID convention')
 # server ID
 parser.add_argument('-id', required=True, help='UNIVERSE server ID')
 #Parse app ID
-parser.add_argument('-parseid', required=True, help='Parse app ID')
+parser.add_argument('-parseid', default="", required=False, help='Parse app ID')
 #Parse client key
-parser.add_argument('-parseck', required=True, help='Parse client key')
+parser.add_argument('-parseck', default="", required=False, help='Parse client key')
+#Batch ID
+parser.add_argument('-batch', default="", required=False, help='Batch ID')
 # Flurry ID
 parser.add_argument('-flurry', required=True, help='Flurry app ID')
 # Coins
@@ -50,10 +52,15 @@ iap = args.iap
 serverID = args.id
 parseid = args.parseid
 parseck = args.parseck
+batch = args.batch
 flurry = args.flurry
 coins = args.coins
 ver = args.ver
 reskinutils.run = args.run
+
+if (parseid=="" or parseck=="") and batch=="":
+    print("Please enter one of Parse or Batch IDs.")
+    sys.exit()
 
 configFile = trgDir + "/SimpleSlots/configure.h"
 infoPlistFile = trgDir + "/SimpleSlots/PartySlots-Info.plist"
@@ -91,7 +98,7 @@ dirToCopy = "/SimpleSlots/artwork/reskin"
 subdirs = ["/LevelSelect", "/lvl1", "/lvl2", "/lvl3", "/lvl4"]
 for i in range(0, len(subdirs)):
     reskinutils.copyFilesByGlob(assets + subdirs[i] + "/*.png", trgDir + dirToCopy + subdirs[i])
-reskinutils.checkCopy([4 * 20 + 2 * 2 * 4 + 4, 4 * 20 + 2 * 2 * 4 + 3, 4 * 20 + 2 * 2 * 4, 4 * 20 + 2 * 2 * 4 + 2, 103])
+reskinutils.checkCopy([4 * 20 + 2 * 2 * 4 + 4, 4 * 20 + 2 * 2 * 4 + 3, 4 * 20 + 2 * 2 * 4, 4 * 20 + 2 * 2 * 4 + 2, 103, 104])
 print("Done.")
 
 # replace simpleslots/artwork/feature_overlay*
@@ -154,15 +161,23 @@ print("Replacing version & build...")
 reskinutils.replaceInFile(infoPlistFile, "enter_version_here", ver)
 print("Done.")
 
+#replace Batch ID
+if batch!="":
+    print("Replacing Batch ID...")
+    reskinutils.replaceInFile(configFile, "<enter_batch_key_here>", batch)
+    print("Done.")
+
 # replace Parse ID
-print("Replacing parse ID...")
-reskinutils.replaceInFile(configFile, "<enter_parse_app_id_here>", parseid)
-print("Done.")
+if parseid!="":
+    print("Replacing parse ID...")
+    reskinutils.replaceInFile(configFile, "<enter_parse_app_id_here>", parseid)
+    print("Done.")
 
 # replace Parse client key
-print("Replacing parse client key...")
-reskinutils.replaceInFile(configFile, "<enter_parse_client_key_here>", parseck)
-print("Done.")
+if parseck!="":
+    print("Replacing parse client key...")
+    reskinutils.replaceInFile(configFile, "<enter_parse_client_key_here>", parseck)
+    print("Done.")
 
 # replace Flurry ID
 print("Replacing flurry default ID...")
