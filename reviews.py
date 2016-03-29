@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 from __future__ import print_function
-import requests, mechanize, cookielib, sys, os
+import requests, mechanize, cookielib, sys, os, argparse
 from lxml import html
 from time import sleep
 
@@ -19,6 +19,12 @@ INSTALL4INSTALL_LOGOUT_URL = "http://install4install.com/logout.php"
 INSTALL4INSTALL_LOGIN_USER_ELEMENT = "username"
 INSTALL4INSTALL_LOGIN_PASSWORD_ELEMENT = "password"
 INSTALL4INSTALL_PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/install4install.passwords"
+
+
+parser = argparse.ArgumentParser(description='Create app on GCM and upload p12 file')
+parser.add_argument('-i4i', required=False, dest='i4i', action='store_true', help='Include Install4Install')
+args = parser.parse_args()
+i4i = args.i4i
 
 def dot():
     sys.stdout.write(".")
@@ -47,7 +53,7 @@ def getCredentials(inputFile):
         return dict
 
 def main():
-    print("Reviews control script for Smoothreviews & Install4Install - by Liran Cohen V1.0")
+    print("Reviews control script for Smoothreviews & Install4Install - by Liran Cohen V1.2")
     session_requests = requests.session()
 
     # SMOOTHREVIEWS
@@ -88,57 +94,58 @@ def main():
             # Logout
             result = session_requests.get(SMOOTHREVIEW_LOGOUT_URL, headers = dict(referer = SMOOTHREVIEW_LOGOUT_URL))
 
-    # Install4Install
-    reviewingData = getCredentials(INSTALL4INSTALL_PASSWORDS_FILE)
-    print("Install4Install:\n----------------")
-    browser = mechanize.Browser()
-    # Enable cookie support for urllib2
-    cookiejar = cookielib.LWPCookieJar()
-    browser.set_cookiejar( cookiejar )
-    browser.set_handle_refresh(False)
-    browser.set_handle_equiv( True )
-    browser.set_handle_gzip( True )
-    browser.set_handle_redirect( True )
-    browser.set_handle_referer( True )
-    browser.set_handle_robots( False )
-    browser.addheaders = [ ( 'User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1' ) ]
+    if i4i:
+        # Install4Install
+        reviewingData = getCredentials(INSTALL4INSTALL_PASSWORDS_FILE)
+        print("Install4Install:\n----------------")
+        browser = mechanize.Browser()
+        # Enable cookie support for urllib2
+        cookiejar = cookielib.LWPCookieJar()
+        browser.set_cookiejar( cookiejar )
+        browser.set_handle_refresh(False)
+        browser.set_handle_equiv( True )
+        browser.set_handle_gzip( True )
+        browser.set_handle_redirect( True )
+        browser.set_handle_referer( True )
+        browser.set_handle_robots( False )
+        browser.addheaders = [ ( 'User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1' ) ]
 
-    for reviewer in reviewingData:
-        print(reviewer + ":")
+        for reviewer in reviewingData:
+            print(reviewer + ":")
 
-        for cred in reviewingData[reviewer]:
-            print(cred, end='')
-            while True:
-                try:
+            for cred in reviewingData[reviewer]:
+                print(cred, end='')
+                while True:
+                    try:
 
-                    # Login
-                    dot()
-                    res = browser.open(INSTALL4INSTALL_LOGIN_URL, timeout=1.0)
-                    browser.select_form(nr = 0)
-                    browser.form[INSTALL4INSTALL_LOGIN_USER_ELEMENT] = cred
-                    browser.form[INSTALL4INSTALL_LOGIN_PASSWORD_ELEMENT] = reviewingData[reviewer][cred]
-                    dot()
-                    browser.submit()
+                        # Login
+                        dot()
+                        res = browser.open(INSTALL4INSTALL_LOGIN_URL, timeout=1.0)
+                        browser.select_form(nr = 0)
+                        browser.form[INSTALL4INSTALL_LOGIN_USER_ELEMENT] = cred
+                        browser.form[INSTALL4INSTALL_LOGIN_PASSWORD_ELEMENT] = reviewingData[reviewer][cred]
+                        dot()
+                        browser.submit()
 
-                    # Go to user panel
-                    dot()
-                    res = browser.open(INSTALL4INSTALL_SITE_URL, timeout=1.0)
+                        # Go to user panel
+                        dot()
+                        res = browser.open(INSTALL4INSTALL_SITE_URL, timeout=1.0)
 
-                    # Scrape
-                    currPoints = res.get_data().split("mypoints\'>",1)[1].split("|",1)[0]
-                    reviewsToDoThisMonth = res.get_data().split("month!\'>",1)[1].split(" remaining",1)[0]
+                        # Scrape
+                        currPoints = res.get_data().split("mypoints\'>",1)[1].split("|",1)[0]
+                        reviewsToDoThisMonth = res.get_data().split("month!\'>",1)[1].split(" remaining",1)[0]
 
-                    # Print
-                    print(" " + currPoints + "points, need to do " + reviewsToDoThisMonth + " more reviews this month")
+                        # Print
+                        print(" " + currPoints + "points, need to do " + reviewsToDoThisMonth + " more reviews this month")
 
-                    #Logout
-                    browser.open(INSTALL4INSTALL_LOGOUT_URL, timeout=1.0)
+                        #Logout
+                        browser.open(INSTALL4INSTALL_LOGOUT_URL, timeout=1.0)
 
-                except Exception as e:
-                    print("Caught exception for account " + cred + " - retrying... " + str(e))
-                    browser.open(INSTALL4INSTALL_LOGOUT_URL, timeout=1.0)
-                    continue
-                break
+                    except Exception as e:
+                        print("Caught exception for account " + cred + " - retrying... " + str(e))
+                        browser.open(INSTALL4INSTALL_LOGOUT_URL, timeout=1.0)
+                        continue
+                    break
 
     print("Done.")
 
