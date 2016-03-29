@@ -5,6 +5,9 @@ from datetime import date, timedelta
 import pycurl, json
 from StringIO import StringIO
 import xml.etree.ElementTree as ET
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # Casinoland details
 CASINOLAND_LOGIN_URL = "www.affiliateland.com"
@@ -21,21 +24,31 @@ KEYS = ["Casinoland", "Buffalo_Main_Account", "Buffalo_Second_Account", "Appanni
 BUFFALO_EARNINGS_CLASS = "loggedin-highlight"
 APPANNIE_SALES = 'sales_list'
 APPANNIE_AD_ACCOUNTS = {265056: "Applovin main", 285034: "Chartboost main", 265057: "Playhaven casino", 275073: "Playhaven beezbee", 265060: "Admob", 291338: "Vungle"}
-APPANNIE_ACCOUNTS = [264936, 264941, 264937, 294753, 264940, 264935, 264938, 264939, 316870, 264944, 294479, 264943, 264942]
+APPANNIE_ACCOUNTS = [264936, 264941, 264937, 294753, 264940, 264935, 264938, 264939, 264944, 264943, 264942]
 SLEEP_TIME = 30
+LAST_DAYS = 7
+TOTAL_ADS_INDEX = 2
+GRAPH_VALUE_SIZE = 7
 
 # Parse inputs
 parser = argparse.ArgumentParser(description='Income script')
 # include IAP?
-parser.add_argument('-iap', default=0, required=False, help='Include IAP? [0/1]')
+parser.add_argument('-iap', default=False, required=False, dest='includeIAP', action='store_true', help='Include IAP')
 # specific month?
 parser.add_argument('-month', default="", required=False, help='Specific month? for example: 2016-02')
-includeIAP = (parser.parse_args().iap == "1")
+# show only today results from appannie
+parser.add_argument('-onlyToday', default=False, required=False, dest='onlyToday', action='store_true', help='Show only today')
 
-inputMonth = parser.parse_args().month
+args = parser.parse_args()
+includeIAP = args.includeIAP
+inputMonth = args.month
 month = (inputMonth if (inputMonth != "") else date.today().strftime('%Y-%m'))
 firstDayOfMonth = month + "-01"
 lastDayOfMonth = (month + "-" + str(calendar.monthrange(int(month.split("-")[0]), int(month.split("-")[1].lstrip("0")))[1]) if (inputMonth != "") else time.strftime("%Y-%m-%d"))
+onlyToday = args.onlyToday
+
+if (onlyToday):
+    includeIAP = True
 
 def getCredentials(inputFile):
     accounts = {}
@@ -48,8 +61,65 @@ def getCredentials(inputFile):
 def pageBreak():
     print "===================================="
 
+# Get Appannie data for start until end dates
+def getAppannieForDates(accounts, start, end, getIAP = True, sleepForIAP = False):
+    user, password = accounts[KEYS[3]]
+    b = StringIO()
+    curl = pycurl.Curl()
+    curl.setopt(pycurl.WRITEFUNCTION, b.write)
+    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account")
+    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + start + "&end_date=" + end)
+    curl.setopt(pycurl.HTTPHEADER, ['Authorization: Bearer ' + user])
+    curl.perform()
+    j = json.loads(b.getvalue())
+
+    if len(j[APPANNIE_SALES]) == 0:
+        curl.close()
+        return False
+
+    # prepare IAP info
+    totalIAP = 0
+    if (getIAP):
+        for i in APPANNIE_ACCOUNTS:
+            b.truncate(0)
+            curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + start + "&end_date=" + end)
+            curl.perform()
+            iapj = json.loads(b.getvalue())
+            try:
+                if iapj['sales_list']:
+                    totalIAP += (float(iapj['sales_list'][0]['revenue']['iap']['sales']) - float(iapj['sales_list'][0]['revenue']['iap']['refunds']))
+            except:
+                print "Caught exception: Invalid Account? " + str(i)
+        if sleepForIAP:
+            time.sleep(SLEEP_TIME)
+
+    total = 0
+    for i in j[APPANNIE_SALES]:
+        if not 'revenue' in i['metric']:
+            continue
+        total += float(i['metric']['revenue'])
+
+    curl.close()
+    return [start, end, total, getIAP, totalIAP, total + totalIAP, j[APPANNIE_SALES]]
+
+# Print Appannie data
+def printAppannie(dataList):
+    start, end, totalAds, printIAP, totalIAP, total, table = dataList
+    print "Appannie info for " + start + " - " + end + ":"
+
+    for i in table:
+        if not 'revenue' in i['metric']:
+            continue
+        print APPANNIE_AD_ACCOUNTS[i['ad_account']] + ": " + str(i['metric']['revenue']) + "$"
+
+    print "\nTotal ads: " + str(totalAds) + "$"
+    if (printIAP):
+        print "Total IAP: " + str(totalIAP) + "$"
+    print "\nTotal: " + str(total) + "$"
+    pageBreak()
+
 def main():
-    print "Income info script - by Liran Cohen V1.4"
+    print "Income info script - by Liran Cohen V1.5"
 
     # Get credentials
     accounts = getCredentials(PASSWORDS_FILE)
@@ -96,120 +166,47 @@ def main():
         pageBreak()
     pageBreak()
 
-    #Login Appannie
+    #Appannie
+    # Yesterday's data (or 2 days ago)
     print "Getting Appannie yesterday's data..."
-    user, password = accounts[KEYS[3]]
-    yesterday = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+    yesterdayTimeDelta = 1
+    yesterday = (date.today() - timedelta(yesterdayTimeDelta)).strftime('%Y-%m-%d')
     deductFor30 = 30
-    b = StringIO()
-    curl = pycurl.Curl()
-    curl.setopt(pycurl.WRITEFUNCTION, b.write)
-    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account")
-    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + yesterday + "&end_date=" + yesterday)
-    curl.setopt(pycurl.HTTPHEADER, ['Authorization: Bearer ' + user])
-    curl.perform()
-    j = json.loads(b.getvalue())
 
-    if (len(j[APPANNIE_SALES]) == 0):
-        print "No Appannie info for yesterday, retrieving day before..."
-        b.truncate(0)
-        yesterday = (date.today() - timedelta(2)).strftime('%Y-%m-%d')
+    data = getAppannieForDates(accounts, yesterday, yesterday, includeIAP, (False if onlyToday else includeIAP))
+    if data:
+        printAppannie(data)
+    else:
+        yesterdayTimeDelta = 2
+        yesterday = (date.today() - timedelta(yesterdayTimeDelta)).strftime('%Y-%m-%d')
         deductFor30 = 31
-        curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + yesterday + "&end_date=" + yesterday)
-        curl.perform()
-        j = json.loads(b.getvalue())
+        data = getAppannieForDates(accounts, yesterday, yesterday, includeIAP, (False if onlyToday else includeIAP))
+        printAppannie(data)
 
-    # prepare IAP info
-    totalIAP = 0
-    for i in APPANNIE_ACCOUNTS:
-        b.truncate(0)
-        curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + yesterday + "&end_date=" + yesterday)
-        curl.perform()
-        iapj = json.loads(b.getvalue())
-        if iapj['sales_list']:
-            totalIAP += (float(iapj['sales_list'][0]['revenue']['iap']['sales']) - float(iapj['sales_list'][0]['revenue']['iap']['refunds']))
-    if includeIAP:
-        time.sleep(SLEEP_TIME)
+    if onlyToday:
+        return
 
-    print "Appannie info for " + yesterday + ":"
-    total = 0
-    for i in j[APPANNIE_SALES]:
-        if not 'revenue' in i['metric']:
-            continue
-        total += float(i['metric']['revenue'])
-        print APPANNIE_AD_ACCOUNTS[i['ad_account']] + ": " + str(i['metric']['revenue']) + "$"
+    #Get last LAST_DAYS days ads values and print graph
+    print "Getting last " + str(LAST_DAYS) + " days ads results:"
+    lastDays = [data[TOTAL_ADS_INDEX]]    #init with today value
+    for i in range(1, LAST_DAYS):
+        day = (date.today() - timedelta(yesterdayTimeDelta + i)).strftime('%Y-%m-%d')
+        data = getAppannieForDates(accounts, day, day, False)
+        lastDays.append(data[TOTAL_ADS_INDEX])
 
-    print "\nTotal ads: " + str(total) + "$"
-    print "Total IAP: " + str(totalIAP) + "$"
-    print "\nTotal: " + str(total + totalIAP) + "$"
-    pageBreak()
+    sortedLastDays = sorted(lastDays, key=float, reverse=True)
+    for i in sortedLastDays:
+        print (str(i) + "$").rjust(GRAPH_VALUE_SIZE * (lastDays.index(i) + 1))
 
+    # Last 30 days data
     thirtyDays = (date.today() - timedelta(deductFor30)).strftime('%Y-%m-%d')
     today = date.today().strftime('%Y-%m-%d')
     print "Getting Appannie last 30 days data (" + thirtyDays + " - " + yesterday + ")..."
-    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + thirtyDays + "&end_date=" + today)
-    curl.setopt(pycurl.HTTPHEADER, ['Authorization: Bearer ' + user])
-    b.truncate(0)
-    curl.perform()
-    j = json.loads(b.getvalue())
+    printAppannie(getAppannieForDates(accounts, thirtyDays, yesterday, includeIAP, includeIAP))
 
-    # prepare IAP info
-    if includeIAP:
-        totalIAP = 0
-        for i in APPANNIE_ACCOUNTS:
-            b.truncate(0)
-            curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + thirtyDays + "&end_date=" + today)
-            curl.perform()
-            iapj = json.loads(b.getvalue())
-            if iapj['sales_list']:
-                totalIAP += (float(iapj['sales_list'][0]['revenue']['iap']['sales']) - float(iapj['sales_list'][0]['revenue']['iap']['refunds']))
-        time.sleep(SLEEP_TIME)
-
-    total = 0
-    for i in j[APPANNIE_SALES]:
-        if not 'revenue' in i['metric']:
-            continue
-        total += float(i['metric']['revenue'])
-        print APPANNIE_AD_ACCOUNTS[i['ad_account']] + ": " + str(i['metric']['revenue']) + "$"
-
-    print "\nTotal ads: " + str(total) + "$"
-    if includeIAP:
-        print "Total IAP: " + str(totalIAP) + "$"
-        total+=totalIAP
-    print "\nTotal: " + str(total) + "$"
-    pageBreak()
-
-    # beginningOfMonth = date.today().strftime('%Y-%m-01')
+    # Data from starting of the month
     print "Getting Appannie data from the beginning of the month (" + firstDayOfMonth + " - " + lastDayOfMonth + ")..."
-    curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/ads/sales?break_down=ad_account&start_date=" + firstDayOfMonth + "&end_date=" + lastDayOfMonth)
-    curl.setopt(pycurl.HTTPHEADER, ['Authorization: Bearer ' + user])
-    b.truncate(0)
-    curl.perform()
-    j = json.loads(b.getvalue())
-
-    # prepare IAP info
-    totalIAP = 0
-    for i in APPANNIE_ACCOUNTS:
-        b.truncate(0)
-        curl.setopt(pycurl.URL, "https://api.appannie.com/v1.2/accounts/" + str(i) + "/sales?start_date=" + firstDayOfMonth + "&end_date=" + lastDayOfMonth)
-        curl.perform()
-        iapj = json.loads(b.getvalue())
-        if iapj['sales_list']:
-            totalIAP += (float(iapj['sales_list'][0]['revenue']['iap']['sales']) - float(iapj['sales_list'][0]['revenue']['iap']['refunds']))
-
-    total = 0
-    for i in j[APPANNIE_SALES]:
-        if not 'revenue' in i['metric']:
-            continue
-        total += float(i['metric']['revenue'])
-        print APPANNIE_AD_ACCOUNTS[i['ad_account']] + ": " + str(i['metric']['revenue']) + "$"
-
-    print "\nTotal ads: " + str(total) + "$"
-    print "Total IAP: " + str(totalIAP) + "$"
-    print "\nTotal: " + str(total + totalIAP) + "$"
-    pageBreak()
-
-    curl.close()
+    printAppannie(getAppannieForDates(accounts, firstDayOfMonth, lastDayOfMonth, True))
 
     print "Done!"
 if __name__ == '__main__':
