@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3 -u
 import argparse, sys, reskinutils, os, random, time
 from random import randint
 from reskinutils import reskinPrint

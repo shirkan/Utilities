@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python -u
 from __future__ import print_function
 import requests, mechanize, cookielib, sys, os, argparse, re
 from lxml import html

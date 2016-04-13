@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python -u
 import sys, time, itertools, argparse, json, httplib, os, csv
 
 # Consts
