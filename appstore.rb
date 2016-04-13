@@ -2,6 +2,7 @@
 require "spaceship"
 require "date"
 require "credentials_manager"
+require "open3"
 
 # Consts
 NONE = "none"
@@ -65,7 +66,8 @@ MAIN_MENU_OPTIONS = { "----- MAIN MENU -----" => MENUTITLE::GENERAL_TITLE,
     "Create Batch ID" => "createBatchID",
     "Create Parse app ID & client key (DEPRECATED)" => "createParse",
     "Select latest build" => "selectLatestBuild",
-    "Submit for review" => "submitForReview",
+    "Submit new version for review" => "submitNewVersionForReview",
+    "Submit update for review" => "submitUpdateForReview",
     "Exit" => "exit"
 }
 
@@ -85,13 +87,15 @@ $currLogin = { "currAccount" => NONE,
     "currApp" => NONE,
     "currAppName" => NONE,
     "currBundleID" => NONE,
-    "currAppType" => NONE
+    "currAppType" => NONE,
+    "currAppID" => NONE
 }
 
 $currIDs = { "flurry" => NONE,
     "universe" => NONE,
     "parseAppID" => NONE,
-    "parseClientKey" => NONE
+    "parseClientKey" => NONE,
+    "batch" => NONE
 }
 
 $today = Date.today()
@@ -193,8 +197,15 @@ end
 # execute process and return output
 def execute(cmd)
     puts "Running #{cmd}"
-    res = %x[#{cmd} 2>&1].chomp()
-    puts res
+    res = ""
+    Open3.popen2e(cmd) do |stdin, stdout_err, wait_thr|
+        while line = stdout_err.gets
+            puts line
+            res += line
+        end
+    end
+    res = res.chomp()
+    # puts res
     return res
 end
 
@@ -289,11 +300,12 @@ def displayCredentials()
 end
 
 # Set current app
-def setCurrentApp(app, name, bundle_id, type)
+def setCurrentApp(app, name, bundle_id, type, app_id)
     $currLogin["currApp"] = app
     $currLogin["currAppName"] = name
     $currLogin["currBundleID"] = bundle_id
     $currLogin["currAppType"] = type
+    $currLogin["currAppID"] = app_id
     $currIDs.each_key {|k| $currIDs[k] = NONE}
 end
 
@@ -315,7 +327,7 @@ def selectApp()
         return
     end
 
-    setCurrentApp(Spaceship::Tunes::Application.find(all_apps[option].apple_id), all_apps[option].name, all_apps[option].bundle_id, NONE)
+    setCurrentApp(Spaceship::Tunes::Application.find(all_apps[option].apple_id), all_apps[option].name, all_apps[option].bundle_id, NONE, all_apps[option].apple_id)
     selectType()
 end
 
@@ -430,6 +442,7 @@ def saveKeywords()
     puts "Saving keywords to file: #{filename}"
 
     f = File.open(filename, "w")
+    f.puts("[keywords]")
     keywords.keys.each {|lang| f.puts("#{lang}=#{keywords[lang]}")}
     f.close()
 
@@ -582,12 +595,15 @@ def createNewApp()
             name = gets.chomp()
             return if name=='0'
 
-            bundleID = "com.#{$currLogin["currAccount"].split("@")[0]}.#{name.downcase.gsub(" ","")}"
+            bundleID = "com.#{$currLogin["currAccount"].split("@")[0]}.#{name.downcase.gsub(" ","").gsub("'","").gsub("-","").gsub(":","")}"
             puts "Enter bundle id (default is #{bundleID}):"
             inputBundle = gets.chomp()
             inputBundle = bundleID if inputBundle == ""
 
+            puts "configData['sku'] is #{configData["sku"]}"
             sku = configData["sku"].concat("_#{$today.day}-#{$today.month}-#{$today.year}").concat("_" + rand().to_s().split(".",2)[1][1..5.to_i])
+            puts "sku is #{sku}"
+
             lang = configData["primaryLangauge"]
             version = configData["version"]
 
@@ -598,7 +614,8 @@ def createNewApp()
             # Create new app entry on ITC
             puts "Registering a new app on ITC with the following details:\nName: #{name}\nBundle ID: #{inputBundle}\nSKU: #{sku}\nPrimary language: #{lang}\nVersion: #{version}"
             app = Spaceship::Tunes::Application.create!(name: name, primary_language: lang, version: version, sku: sku, bundle_id: inputBundle)
-            setCurrentApp(Spaceship::Tunes::Application.find(inputBundle), name, inputBundle, type)
+            app = Spaceship::Tunes::Application.find(inputBundle)
+            setCurrentApp(app, name, inputBundle, type, app.apple_id)
             # setCurrentApp(app, name, inputBundle, type)
 
             puts "App created succesfully on ITC and Developers Portal, no errors should occur now..."
@@ -638,7 +655,7 @@ def createNewApp()
 
         rescue => e
             putsc "Caught exception: #{e}\n\nPlease fix and retry.", "e"
-            setCurrentApp(NONE, NONE, NONE, NONE)
+            setCurrentApp(NONE, NONE, NONE, NONE, NONE)
         end
         break if !keepTrying
     end
@@ -1093,6 +1110,7 @@ def createNewSlotsBuildReskinIOS()
             end
         end
         $currIDs["universe"] = universe
+        $currIDs["universe"] = NONE if universe == ""
     end
 
     while flurry == "" do
@@ -1112,6 +1130,7 @@ def createNewSlotsBuildReskinIOS()
             end
         end
         $currIDs["flurry"] = flurry
+        $currIDs["flurry"] = NONE if flurry == ""
     end
 
     #Batch ID
@@ -1124,7 +1143,7 @@ def createNewSlotsBuildReskinIOS()
             batchID = $currIDs["batch"] if batchID.downcase == 'y' or batchID == ""
             batchID = "" if batchID.downcase == "n"
         else
-            puts "Enter Batch ID or just press enter to call parse script. enter 0 to return:"
+            puts "Enter Batch ID or just press enter to call Batch script. enter 0 to return:"
             batchID = gets().chomp()
             return if batchID == "0"
             if batchID == ""
@@ -1133,6 +1152,7 @@ def createNewSlotsBuildReskinIOS()
             end
         end
         $currIDs["batch"] = batchID
+        $currIDs["batch"] = NONE if batchID == ""
     end
 
     #Coins
@@ -1148,7 +1168,7 @@ def createNewSlotsBuildReskinIOS()
     return if ver == "0"
     ver = "1.0" if ver == ""
 
-    puts "Name: #{name}\nSource:#{source}\nTarget:#{target}\nBundleID:#{bundleID}\nIAP:#{iap}\nLeaderboard:#{leaderboard}\nUniverse ID:#{universe}\nFlurry App ID:#{flurry}\nBatch ID:#{batchID}\nCoins:#{coins}\nVersion:#{ver}"
+    puts "Name: #{name}\nSource: #{source}\nTarget: #{target}\nBundleID: #{bundleID}\nIAP: #{iap}\nLeaderboard: #{leaderboard}\nUniverse ID: #{universe}\nFlurry App ID: #{flurry}\nBatch ID: #{batchID}\nCoins: #{coins}\nVersion: #{ver}"
     puts "Are these details correct? ([y]/n)"
     option = gets().chomp()
     return createNewSlotsBuildReskinIOS() if option.downcase == "n"
@@ -1214,7 +1234,8 @@ def createNewSlotsBuildReskinGFX2IOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["universe"] = universe if universe != ""
+        $currIDs["universe"] = universe
+        $currIDs["universe"] = NONE if universe == ""
     end
 
     while flurry == "" do
@@ -1233,7 +1254,8 @@ def createNewSlotsBuildReskinGFX2IOS()
                 flurry = $currIDs["flurry"]
             end
         end
-        $currIDs["flurry"] = flurry if flurry != ""
+        $currIDs["flurry"] = flurry
+        $currIDs["flurry"] = NONE if flurry == ""
     end
 
     #Batch ID
@@ -1246,7 +1268,7 @@ def createNewSlotsBuildReskinGFX2IOS()
             batchID = $currIDs["batch"] if batchID.downcase == 'y' or batchID == ""
             batchID = "" if batchID.downcase == "n"
         else
-            puts "Enter Batch ID or just press enter to call parse script. enter 0 to return:"
+            puts "Enter Batch ID or just press enter to call Batch script. enter 0 to return:"
             batchID = gets().chomp()
             return if batchID == "0"
             if batchID == ""
@@ -1254,7 +1276,8 @@ def createNewSlotsBuildReskinGFX2IOS()
                 batchID = $currIDs["batch"]
             end
         end
-        $currIDs["batch"] = batchID if batchID != ""
+        $currIDs["batch"] = batchID
+        $currIDs["batch"] = NONE if batchID == ""
     end
 
     #Coins
@@ -1280,7 +1303,7 @@ end
 
 def createPushNotification()
     puts "Creating Push Notification certificate for #{$currLogin["currBundleID"]} for user #{$currLogin["currAccount"]} using pem (make sure you have it installed)..."
-    system("pem -a #{$currLogin["currBundleID"]} -u #{$currLogin["currAccount"]}")
+    system("pem -a #{$currLogin["currBundleID"]} -u #{$currLogin["currAccount"]} --force")
 end
 
 def createProvisioningFile()
@@ -1362,9 +1385,6 @@ def createUniverseID()
         template = config["templates"][0]
     end
 
-    putsc "executing:    #{$config["externalUtilities"]["dir"]} + #{$config["externalUtilities"]["universe"]} + -name '#{name}' -flurry #{flurry} -template '#{template}'"
-    return
-
     returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["universe"] + " -name '#{name}' -flurry #{flurry} -template '#{template}'")
     $currIDs["universe"] = returnValue.split("acc respond:")[1]
     puts "Universe ID: #{$currIDs["universe"]}"
@@ -1381,7 +1401,7 @@ def createBatchID()
     p12 = gets().chomp()
     return if p12 == "0"
 
-    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["batch"] + " -name '#{name}' -p12 #{p12} -oldFirefox")
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["batch"] + " -name '#{name}' -p12 #{p12}")
     $currIDs["batch"] = returnValue.split("acc respond:")[1]
     puts "Batch ID: #{$currIDs["batch"]}"
 end
@@ -1431,8 +1451,14 @@ def uploadP12ToParse()
     returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["parsep12"] + " -file '#{inputFile}' -account #{$currLogin["currAccount"]} -app '#{name}'")
 end
 
-def submitForReview()
-    puts "Not yet implemented..."
+def submitNewVersionForReview()
+    puts "Running iTunes Submit script..."
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["itunes_submit"] + " -id '#{$currLogin["currAppID"]}' -account #{$currLogin["currAccount"]}")
+end
+
+def submitUpdateForReview()
+    puts "Running iTunes Submit script..."
+    returnValue = execute($config["externalUtilities"]["dir"] + $config["externalUtilities"]["itunes_submit"] + " -id '#{$currLogin["currAppID"]}' -account #{$currLogin["currAccount"]} -update")
 end
 
 def updatePrivacyURL()
@@ -1508,7 +1534,7 @@ end
 def printHeaders()
     # headers
         puts "Current logged account: " + $currLogin["currAccount"]
-        puts "Current selected app: " + $currLogin["currAppName"]
+        puts "Current selected app: (" + $currLogin["currAppID"] + ") " + $currLogin["currAppName"]
         puts "Current app type: " + $currLogin["currAppType"] if $currLogin["currAppType"] != NONE
 end
 
@@ -1614,7 +1640,7 @@ end
 # ------------------------------------------------
 
 # Begin script
-puts "Appstore Control Center V1.17 - By Liran Cohen"
+puts "Appstore Control Center V1.18 - By Liran Cohen"
 init()
 pageBreak()
 mainMenu()
