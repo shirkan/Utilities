@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3 -u
 import argparse, sys, reskinutils, os
 
 print("Graphics 2 Android slots reskinner v1.1")

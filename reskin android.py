@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3 -u
 import argparse, sys, reskinutils
 
 print("Android slots reskinner v1.3")
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 	print("Replacing BASE KEY...")
 	reskinutils.replaceInFile(bigCasinoSlotsActivityFile, "enter_base_key_here", basekey)
 	print("Done.")
-	
+
 	# replace initial coins
 	print("Replacing initial coins to " + str(coins) + "...")
 	reskinutils.replaceInFile(mainMenuLayerFile, "enter_initial_coins_here", str(coins))

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python -u
 import requests, mechanize, cookielib, sys, time
 import argparse,json,httplib,os
 from selenium import webdriver

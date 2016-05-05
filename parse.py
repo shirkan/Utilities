@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python -u
 import argparse,json,httplib,os
 
 print "Parse create app script - by Liran Cohen V1.0"

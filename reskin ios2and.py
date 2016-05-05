@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3 -u
 import argparse, sys, reskinutils, os
 
 print("iOS 2 Android slots reskinner v1.0")
@@ -73,7 +73,7 @@ if __name__ == '__main__':
 				fileToCopy = srcReskin + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j].title() + "@2x.png"
 				if not (os.path.isfile(fileToCopy)):
 					sys.exit("Cannot find " + srcReskin + "/lvl" + str(i+1) + "/lvl" + str(i+1) + "item_" + assetsDict[j] + "@2x.png or " + fileToCopy)
-			
+
 			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "item_" + assetsDict[j].title() + "@2x.png")
 			reskinutils.copyFilesByName(fileToCopy, trgAssets + "/" + reelsDict[i] + "/" + assetsDict[j].title() + "_" + reelsDict[i] +".png")
 	reskinutils.checkCopy(len(reelsDict) * len(assetsDict) * 2)
@@ -114,7 +114,7 @@ if __name__ == '__main__':
 	print("Replacing BASE KEY...")
 	reskinutils.replaceInFile(bigCasinoSlotsActivityFile, "enter_base_key_here", basekey)
 	print("Done.")
-	
+
 	# replace initial coins
 	print("Replacing initial coins to " + str(coins) + "...")
 	reskinutils.replaceInFile(mainMenuLayerFile, "enter_initial_coins_here", str(coins))

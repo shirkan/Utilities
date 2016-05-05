@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python -u
 import requests, mechanize, cookielib, sys, os
 from lxml import html
 

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3 -u
 import argparse, sys, reskinutils
 
 print("iOS dentist reskinner v1.2")
