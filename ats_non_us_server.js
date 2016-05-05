@@ -1,15 +1,16 @@
 var locallydb = require('locallydb');
-var mandrill = require('mandrill-api/mandrill');
 var express = require('express');
 var fs = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var http = require('http');
 var app     = express();
+var Slack = require('slack-node');
+var slackApiToken = "xoxp-18842002498-18838929923-36817106343-0d0e31f450";
+
 
 //  Globals
 var num_of_games = 200;
-var mandrill_client = new mandrill.Mandrill('78MeL8wSNNw6CkhRDnQzlw');
 var db = new locallydb('./games_db');
 var collection = db.collection('exclusive_non_us');
 const collectionEmpty = { items: [] };
@@ -33,9 +34,9 @@ var countries_completed = 0;
 
 var categories = ["topfreeapplications", "topfreeipadapplications", "toppaidapplications", "toppaidipadapplications"];
 var categoriesToNames = {
-    topfreeapplications: "iPhone Free", 
-    topfreeipadapplications: "iPad Free", 
-    toppaidapplications: "iPhone Paid", 
+    topfreeapplications: "iPhone Free",
+    topfreeipadapplications: "iPad Free",
+    toppaidapplications: "iPhone Paid",
     toppaidipadapplications: "iPad Paid"
 };
 var categories_iterator = 0;
@@ -49,8 +50,9 @@ const ParInDays = 10;
 const ParTime = 1000 * 60 * 60 * 24 * ParInDays;
 const Now = new Date();
 
-function sendMail(data) { 
-	var message = {
+function sendMessage(data) {
+	var message = "[ATS] Exclusive Non-US New Game(s) Alert:\n" + data
+    var old_message = {
 	    "text": "New game(s) alert:\n" + data,
 	    "subject": "[ATS] Exclusive Non-US New Game(s) Alert",
 	    "from_email": "automator@totemedia.co",
@@ -61,18 +63,20 @@ function sendMail(data) {
 	            "type": "to"
 	        }]
 	};
-	var async = false;
-	mandrill_client.messages.send({"message": message, "async": async}, function(result) {
-	    console.log(result);
-	}, function(e) {
-	    // Mandrill returns the error as an object with name and message keys
-	    console.log('A mandrill error occurred: ' + e.name + ' - ' + e.message);
-	    // A mandrill error occurred: Unknown_Subaccount - No subaccount exists with the id 'customer-123'
-	});
+
+    var slack = new Slack(slackApiToken);
+
+    slack.api('chat.postMessage', {
+      text:message,
+      channel:'#new_trends'
+    }, function(err, response){
+      console.log('response: ' + response);
+      console.log('err: ' + err);
+    });
 }
 
 function getURLforCountry (country, category) {
-    var str = 'http://www.appninjaz.com/appsense/index.php?chart=' + category +'&country=' + countries_code[country] + '&genre=6014'; 
+    var str = 'http://www.appninjaz.com/appsense/index.php?chart=' + category +'&country=' + countries_code[country] + '&genre=6014';
     return str;
 }
 
@@ -102,7 +106,7 @@ function getGameReleaseDateInCountry(country, id) {
       //the whole response has been recieved, so we just print it out here
       response.on('end', function () {
         str = JSON.parse(str);
-        
+
         var rawDate = str["results"][0]["releaseDate"].split("T")[0].split("-");
 
         var GameDateObject = new Date(rawDate);
@@ -112,8 +116,8 @@ function getGameReleaseDateInCountry(country, id) {
         if ((Now - ParTime) < GameDateObject) {
             var date = ("0" + rawDate[2]).slice(-2) + "/" + ("0" + rawDate[1]).slice(-2) + "/" + rawDate[0];
             var date_reversed = rawDate[0] + "/" + ("0" + rawDate[1]).slice(-2) + "/" + ("0" + rawDate[2]).slice(-2);
-            
-            entry = date_reversed + " - In " + country + " but not in USA: [Rank #" + ranks[country][id] + "]: "+ id + " - " + ids_to_names[id] + " - " + date + " - " + categoriesToNames[categories[categories_iterator]] + 
+
+            entry = date_reversed + " - In " + country + " but not in USA: [Rank #" + ranks[country][id] + "]: "+ id + " - " + ids_to_names[id] + " - " + date + " - " + categoriesToNames[categories[categories_iterator]] +
             ' - http://www.appninjaz.com/appsense/app_details.php?app_id=' + id + '&country=' + countries_code[country];
             output.push(entry);
         }
@@ -162,7 +166,7 @@ function checkIfGameIsInUSA(country, id) {
 function compareAllToUSA() {
     console.log("Comparing all countries to USA");
     var usa = tables["usa"];
-    
+
 
     for (var country in tables) {
         if (country == "usa") {
@@ -215,13 +219,13 @@ function get_games_list ( country , category) {
     }
     console.log("Found " + country + " with url: " + url);
     request(url, function(error, response, html){
-        
+
         //  Check if we found at least one new ID
         atLeastOneID = false;
 
         if(!error){
             var $ = cheerio.load(html);
-            
+
             // skip children 0 because it's titles row
             tables[country] = [];
             ranks[country] = [];
@@ -229,7 +233,7 @@ function get_games_list ( country , category) {
             for (var i = 1; i<=num_of_games; i++) {
                 var id = $("#game_name_" + i)[0]["attribs"]["href"].split("=")[1].split("&")[0];
                 var idInStorage = country + "_" + id;
-                
+
                 // Check if game was already reported
                 if (collection.where({id : idInStorage}).items.length) {
                 	continue;
@@ -265,7 +269,7 @@ function get_games_list ( country , category) {
             }
         }
 
-    });  
+    });
 }
 
 function iterateNextCategory () {
@@ -274,11 +278,11 @@ function iterateNextCategory () {
         console.log("Checking " + currentCategory + " (" + (categories_iterator+1) + "/" + categories.length + ")");
         countries_completed = 0;
         for (var country in countries_code) {
-            get_games_list(country, currentCategory);    
+            get_games_list(country, currentCategory);
         }
     } else {
         if (output.length) {
-            sendMail(output.sort().reverse().join("\n\n"));    
+            sendMessage(output.sort().reverse().join("\n\n"));
         }
         console.log("Done comparison.");
     }

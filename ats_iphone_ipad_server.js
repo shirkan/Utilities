@@ -1,15 +1,15 @@
 var locallydb = require('locallydb');
-var mandrill = require('mandrill-api/mandrill');
 var express = require('express');
 var fs = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var http = require('http');
 var app     = express();
+var Slack = require('slack-node');
+var slackApiToken = "xoxp-18842002498-18838929923-36817106343-0d0e31f450";
 
 //  Globals
 var num_of_games = 200;
-var mandrill_client = new mandrill.Mandrill('78MeL8wSNNw6CkhRDnQzlw');
 var db = new locallydb('./games_db');
 var collection = db.collection('iphone_ipad');
 const collectionEmpty = { items: [] };
@@ -30,8 +30,9 @@ var types_completed = 0;
 var ids_to_check = {};
 var ids_to_check_count = 0;
 
-function sendMail(data) { 
-    var message = {
+function sendMessage(data) {
+    var message = "[ATS] iPhone Vs. iPad New Game(s) Alert:\n" + data
+    var old_message = {
         "text": "New game(s) alert:\n" + data,
         "subject": "[ATS] iPhone Vs. iPad New Game(s) Alert",
         "from_email": "automator@totemedia.co",
@@ -42,13 +43,14 @@ function sendMail(data) {
                 "type": "to"
             }]
     };
-    var async = false;
-    mandrill_client.messages.send({"message": message, "async": async}, function(result) {
-        console.log(result);
-    }, function(e) {
-        // Mandrill returns the error as an object with name and message keys
-        console.log('A mandrill error occurred: ' + e.name + ' - ' + e.message);
-        // A mandrill error occurred: Unknown_Subaccount - No subaccount exists with the id 'customer-123'
+    var slack = new Slack(slackApiToken);
+
+    slack.api('chat.postMessage', {
+      text:message,
+      channel:'#new_trends'
+    }, function(err, response){
+      console.log('response: ' + response);
+      console.log('err: ' + err);
     });
 }
 
@@ -81,10 +83,10 @@ function getGameInfo(id, kind) {
       //the whole response has been recieved, so we just print it out here
       response.on('end', function () {
         str = JSON.parse(str);
-        
+
         var rawDate = str["results"][0]["releaseDate"].split("T")[0].split("-");
         var date = ("0" + rawDate[1]).slice(-2) + "/" + ("0" + rawDate[2]).slice(-2) + "/" + rawDate[0];
-        
+
         output[output_line++] = kind + " only," + id + "," + ids_to_names[id] + "," + str["results"][0]["artistName"].replace(/,/g," ") + "," + date + "\n";
         checkIfScriptIsDone();
 
@@ -167,7 +169,7 @@ function getGamesList ( type ) {
     request(url, function(error, response, html){
         if(!error){
             var $ = cheerio.load(html);
-            
+
             // skip children 0 because it's titles row
             singles_lists[type] = [];
             for (var i = 1; i<=num_of_games; i++) {
@@ -187,12 +189,12 @@ function getGamesList ( type ) {
             findSingles();
         }
 
-    });  
+    });
 }
 
 console.log('Running iPhone vs. iPad script...');
 for (var type in types) {
-    getGamesList(type);    
+    getGamesList(type);
 }
 
 exports = module.exports = app;
