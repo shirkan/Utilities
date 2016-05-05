@@ -1,16 +1,28 @@
-#!/usr/local/bin/python
-import httplib, sys, os, time, argparse, json, mandrill
+#!/usr/local/bin/python -u
+import httplib, sys, os, time, argparse, json, mandrill, slack
 from datetime import date, timedelta
 
 # Casinoland details
 CHARTBOOST_BASE_URL = "analytics.chartboost.com"
+# CAMPAIGNS = {
+#     'adidasbloom@gmail.com' : {
+#         'CASINO - Big 4' : '537b26931873da554a40103f',
+#         'Casino  World - IOS' : '543a6385c26ee42f93d424cc'
+#     },
+#     'totemediainc@gmail.com' : {
+#         'CASINO - Big 4' : '56f2550fa8b63c16e67e2438',
+#         'Casino  World - IOS': '56f256ae8838095e722d9ff9'
+#     }
+# }
 CAMPAIGNS = {
-    'CASINO - Big 4' : '537b26931873da554a40103f',
-    'Casino  World - IOS' : '543a6385c26ee42f93d424cc'
+    'adidasbloom@gmail.com' : {
+        'CASINO - Big 4' : '537b26931873da554a40103f',
+        'Casino  World - IOS' : '543a6385c26ee42f93d424cc'
+    }
 }
 MIN_CV = {
-    'CASINO - Big 4' : 2.5,
-    'Casino  World - IOS' : 1.5
+    'CASINO - Big 4' : 1.4,
+    'Casino  World - IOS' : 1.0
 }
 PASSWORDS_FILE = os.path.dirname(os.path.realpath(__file__)) + "/chartboost.password"
 SLEEP_TIME = 7
@@ -25,9 +37,9 @@ CV_COL = 23
 # Parse inputs
 parser = argparse.ArgumentParser(description='Income script')
 # include IAP?
-parser.add_argument('-dateMin', default='', required=False, dest='dateMin', action='store_true', help='From (YYYY-MM-DD)')
+parser.add_argument('-dateMin', default='', required=False, dest='dateMin', help='From (YYYY-MM-DD)')
 # specific month?
-parser.add_argument('-dateMax', default='', required=False, dest='dateMax', action='store_true', help='To (YYYY-MM-DD)')
+parser.add_argument('-dateMax', default='', required=False, dest='dateMax', help='To (YYYY-MM-DD)')
 # show only today results from appannie
 parser.add_argument('-yesterday', default=False, required=False, dest='yesterday', action='store_true', help='Query only yesterday')
 
@@ -44,22 +56,39 @@ if yesterday:
     dateMin = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
     dateMax = dateMin
 
-filename = "chartboost_report_" + dateMin + "_" + dateMax + ".csv"
+filename = os.path.dirname(os.path.realpath(__file__)) + "/chartboost_report_" + dateMin + "_" + dateMax + ".csv"
+if os.path.exists(filename):
+    os.remove(filename)
 
 def getCredentials(inputFile):
     accounts = {}
-    with open(inputFile) as inFile:
+    foundSubject = False
+    with open(inputFile, "r") as inFile:
         for line in inFile:
-            return line.split()
+            line = line.rstrip("\n")
+            if line == "" or line.startswith("#"):
+                continue
+            if not foundSubject and "[IDs]" not in line:
+                continue
+            else:
+                if not foundSubject and line == "[IDs]":
+                    foundSubject = True
+                else:
+                    if foundSubject and line.startswith("["):
+                        break
+            if len(line.split()) == 1:
+                continue
+            accounts[line.split()[0]] = { 'id' : line.split()[1], 'key' : line.split()[2] }
+    return accounts
 
 def sendJob():
-    global userId, userSignature
+    global account, userId, userSignature
 
     connection = httplib.HTTPSConnection(CHARTBOOST_BASE_URL, 443)
     connection.connect()
-    url = '/v3/metrics/install?dateMin=' + dateMin + '&dateMax=' + dateMax + '&campaignIds=' + (",".join(CAMPAIGNS.values())) + '&userId=' + userId + '&userSignature=' + userSignature
+    url = '/v3/metrics/install?dateMin=' + dateMin + '&dateMax=' + dateMax + '&campaignIds=' + (",".join(CAMPAIGNS[account].values())) + '&userId=' + userId + '&userSignature=' + userSignature
 
-    print "Sending installs request for " + dateMin + " - " + dateMax + "..."
+    print "Sending installs request for " + account + " for date(s) " + dateMin + " - " + dateMax + "..."
 
     connection.request('GET', url)
     jobID = str(json.loads(connection.getresponse().read())['jobId'])
@@ -90,18 +119,22 @@ def getResults(jobID):
     url = '/v3/metrics/jobs/' + jobID
     connection.request('GET', url)
     results = connection.getresponse().read()
+    connection.close()
 
-    with open(filename, "w") as f:
+    with open(filename, "a") as f:
         f.write(results)
 
 def analyzeReport(filename):
+    global account
     if not os.path.isfile(filename):
         print "No such file " + filename
         return
 
     toReport = {}
-    for key in CAMPAIGNS.keys():
+    idsReport = {}
+    for key in CAMPAIGNS[account].keys():
         toReport[key] = []
+        idsReport[key] = []
 
     with open(filename, "r") as f:
         inputData = (f.read().decode("utf-16"))
@@ -126,12 +159,14 @@ def analyzeReport(filename):
             try:
                 costValue = int(lineData[CV_COL])
             except ValueError:
-                costValue = float(lineData[CV_COL])
-
-            # print appID + " " + appName + " (" + appBundle + ") from " + country + " with cost value of " + str(costValue)
+                try:
+                    costValue = float(lineData[CV_COL])
+                except ValueError:
+                    continue
 
             if costValue < MIN_CV[campaign]:
-                toReport[campaign].append(appID + " " + appName + " (" + appBundle + ") from " + country + " with cost value of " + str(costValue))
+                toReport[campaign].append(appID.ljust(25) + " " + appName.ljust(40) + " " + appBundle.ljust(40) + " " + country + " " + str(costValue))
+                idsReport[campaign].append(appID)
 
     finalReport = []
     for key in toReport.keys():
@@ -140,38 +175,37 @@ def analyzeReport(filename):
             for line in toReport[key]:
                 finalReport.append(line + "\n")
             finalReport.append("\n")
+            finalReport.append("Copaste for filtering:\n\n" + "./chartboost_filter.py -ids \"" + ", ".join(list(set(idsReport[key]))) + "\" -campaign " + CAMPAIGNS[account][key] + " -user " + account)
+            finalReport.append("\n\n")
 
     return finalReport
 
 def sendReport(report):
     global dateMin, dateMax
 
-    if len(report) == 0:
+    formattedReport = []
+    for acc in report.keys():
+        if len(acc) != 0:
+            formattedReport += [acc + ":\n", str("".join(report[acc]).encode('utf-8'))]
+
+    if len(formattedReport) == 0:
         print "Nothing to report :)"
         return
 
-    mandrill_client = mandrill.Mandrill('78MeL8wSNNw6CkhRDnQzlw')
-    message = {
-        'from_email' : 'automator@totemedia.co',
-        'from_name' : 'Chartboost Stalker',
-        'subject' : 'Chartboost Cost Value Report for ' + dateMin + ' - ' + dateMax,
-        'to': [{'email': 'totemediainc@gmail.com',
-                'name': 'Totemedia Inc.',
-                'type': 'to'}],
-        'text' : str("".join(report))
-    }
-
-    print "Sending report by mail..."
-    result = mandrill_client.messages.send(message=message)[0]['status']
-    print "Status is: " + str(result)
+    slack.SLsendMessageToChannel("#chartboost_report", str("".join(formattedReport)))
 
 def main():
-    print "Chartboost script - by Liran Cohen V1.0"
-    global userId, userSignature
-    userId, userSignature = getCredentials(PASSWORDS_FILE)
-    jobID = sendJob()
-    checkJob(jobID)
-    sendReport(analyzeReport(filename))
+    print "Chartboost report script - by Liran Cohen V1.3"
+    global account, userId, userSignature
+    accounts = getCredentials(PASSWORDS_FILE)
+    data = {}
+    for account in accounts.keys():
+        userId = accounts[account]['id']
+        userSignature = accounts[account]['key']
+        jobID = sendJob()
+        checkJob(jobID)
+        data[account] = analyzeReport(filename)
+    sendReport(data)
 
     print "Last update: " + str(time.ctime())
     print "Done!"
