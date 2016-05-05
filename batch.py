@@ -1,5 +1,5 @@
-#!/usr/local/bin/python
-import requests, sys, time, argparse, json, httplib, os, traceback
+#!/usr/local/bin/python -u
+import sys, time, argparse, json, os, traceback
 import selenium
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -15,10 +15,11 @@ LOGIN_PASSWORD_ELEMENT = 'password'
 
 ADD_APP_CLASS = "appnav__new"
 APP_NAME_ELEMENT = "app_name"
-IOS_PLATFORM_XPATH = "//button[contains(.,'ios')]"
-IOS_SDK_XPATH = "//button[contains(.,'iOS')]"
+IOS_PLATFORM_XPATH = "//button[@ng-change='vm.updateSdksList()' and contains(.,'ios')]"
+IOS_SDK_XPATH = "//button[@ng-model='vm.app.sdk' and contains(.,'iOS')]"
 ADD_APP_XPATH = "//input[@value='Add this app']"
 
+INTEGRATE_BUTTON_XPATH = "//a[@title='Integrate Batch SDK']/span"
 API_KEY_XPATH = "//span[contains(.,'// live')]"
 P12_FILE_DROPZONE_CSS = 'input[ngf-select]'
 JS_INPUT_FILE = "$('input[type=\"file\"')[0]"
@@ -53,7 +54,7 @@ def getCredentials(inputFile):
             return line.split()
 
 def main():
-    print "Create game on Batch and upload p12 file - by Liran Cohen V1.0"
+    print "Create game on Batch and upload p12 file - by Liran Cohen V1.1"
 
     # Get credentials
     user, password = getCredentials(PASSWORDS_FILE)
@@ -98,11 +99,21 @@ def main():
     appNameEntry.send_keys(name)
     iosButton = b.find_element(By.XPATH, IOS_PLATFORM_XPATH)
     iosButton.click()
+    time.sleep(2)
     WebDriverWait(b, 25).until(EC.element_to_be_clickable((By.XPATH, IOS_SDK_XPATH)))
     iosButton = b.find_element(By.XPATH, IOS_SDK_XPATH)
     iosButton.click()
+    time.sleep(2)
+    WebDriverWait(b, 25).until(EC.element_to_be_clickable((By.XPATH, ADD_APP_XPATH)))
     addAppButton = b.find_element(By.XPATH, ADD_APP_XPATH)
     addAppButton.click()
+
+    # Click Integrate button
+    time.sleep(3)
+    WebDriverWait(b, 25).until(EC.element_to_be_clickable((By.XPATH, INTEGRATE_BUTTON_XPATH)))
+    print "Clicking on 'Integrate' button..."
+    integrateButton = b.find_element(By.XPATH, INTEGRATE_BUTTON_XPATH)
+    integrateButton.click()
 
     # Get Live API key
     WebDriverWait(b, 25).until(EC.presence_of_element_located((By.XPATH, API_KEY_XPATH)))
@@ -111,7 +122,7 @@ def main():
     print "API Key: " + apiKey
 
     # Make file upload visible & upload p12 file
-    WebDriverWait(b, 25).until(EC.element_to_be_clickable((By.XPATH, P12_FILE_DROPZONE_XPATH)))
+    WebDriverWait(b, 25).until(EC.presence_of_element_located((By.CSS_SELECTOR, P12_FILE_DROPZONE_CSS)))
     print "Uploading P12 file..."
     b.execute_script(JS_INPUT_FILE_STYLE + ".visibility = 'visible'; " + JS_INPUT_FILE_STYLE + ".top=0; " + JS_INPUT_FILE_STYLE + ".opacity=1; " + JS_INPUT_FILE_STYLE + ".height='1px'; " + JS_INPUT_FILE_STYLE + ".width='1px'")
     p12Entry = b.find_element(By.CSS_SELECTOR, P12_FILE_DROPZONE_CSS)
@@ -125,6 +136,7 @@ def main():
 
     print "Done."
     print "acc respond:" + apiKey
+    b.close()
 
     return
 if __name__ == '__main__':
